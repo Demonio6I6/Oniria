@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Oniria",
+    "slug": "oniria",
+    "version": "1.0.0",
+    "scheme": "oniria",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nicarao.oniria",
+      "googleServicesFile": "./assets/GoogleService-Info.plist",
+      "jsEngine": "jsc"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.nicarao.oniria",
+      "jsEngine": "hermes",
+      "googleServicesFile": "./assets/google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      "expo-asset",
+      "expo-font"
+    ],
+    "owner": "hayda666",
+    "extra": {
+      "eas": {
+        "projectId": "de3cff3c-af28-4cdb-b751-5997716a55f3"
+      }
+    }
+  }
+}
