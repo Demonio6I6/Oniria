@@ -10,10 +10,13 @@ export const USER_STORAGE_KEYS = {
   profileResponses: uid => `respuestas_${uid}`,
   dreams: uid => `suenosGuardados_${uid}`,
   emotions: uid => `emocionesGuardadas_${uid}`,
-  diaryPassword: uid => `diarioPassword_${uid}`,
-  diaryContent: uid => `diarioContent_${uid}`,
   aiPrivacyConsent: uid => `aiPrivacyConsent_${uid}`,
 };
+
+const LEGACY_USER_STORAGE_KEYS = [
+  uid => `diarioPassword_${uid}`,
+  uid => `diarioContent_${uid}`,
+];
 
 export const getCurrentUser = () => getAuth().currentUser;
 
@@ -88,7 +91,10 @@ export const clearCurrentUserLocalData = async () => {
   const uid = getCurrentUserId();
   if (!uid) return false;
 
-  const storageKeys = Object.values(USER_STORAGE_KEYS)
+  const storageKeys = [
+    ...Object.values(USER_STORAGE_KEYS),
+    ...LEGACY_USER_STORAGE_KEYS,
+  ]
     .map(keyFactory => keyFactory(uid));
 
   await AsyncStorage.multiRemove(storageKeys);

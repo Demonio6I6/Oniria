@@ -10,11 +10,41 @@ export const FIXED_EMOTIONS = [
   'esperanza',
 ];
 
-export const normalizeEmotion = (emocion) =>
-  String(emocion || '').trim().toLowerCase();
+const EMOTION_ALIASES = {
+  alegria: 'alegría',
+  felicidad: 'alegría',
+  temor: 'miedo',
+  ansiedad: 'miedo',
+  angustia: 'miedo',
+  enojo: 'ira',
+  rabia: 'ira',
+  enfado: 'ira',
+  sorpresa: 'sorpresa',
+  culpa: 'culpa',
+  esperanza: 'esperanza',
+  tristeza: 'tristeza',
+  miedo: 'miedo',
+  ira: 'ira',
+};
+
+const stripAccents = (value) =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+export const normalizeEmotion = (emocion) => {
+  const normalized = String(emocion || '').trim().toLowerCase();
+  if (!normalized) return '';
+
+  return EMOTION_ALIASES[stripAccents(normalized)] || normalized;
+};
+
+const getRecordEmotions = (record) => {
+  if (Array.isArray(record?.emociones)) return record.emociones;
+  if (Array.isArray(record?.emotions)) return record.emotions;
+  return [];
+};
 
 export const buildEmotionRecordsFromDreams = (suenos) =>
-  suenos
+  (Array.isArray(suenos) ? suenos : [])
     .filter(sueno => Array.isArray(sueno.emotions) && sueno.emotions.length > 0)
     .map(sueno => ({
       dreamId: sueno.id,
@@ -26,7 +56,10 @@ export const buildEmotionRecordsFromDreams = (suenos) =>
 export const mergeEmotionRecords = (legacyRecords, dreamRecords) => {
   const recordsByKey = new Map();
 
-  [...legacyRecords, ...dreamRecords].forEach((record, index) => {
+  [
+    ...(Array.isArray(legacyRecords) ? legacyRecords : []),
+    ...(Array.isArray(dreamRecords) ? dreamRecords : []),
+  ].forEach((record, index) => {
     const key = record.dreamId || `legacy_${record.timestamp || index}`;
     recordsByKey.set(key, record);
   });
@@ -40,18 +73,26 @@ export const buildEmotionChartData = (records) => {
     conteo[emocion] = 0;
   });
 
-  records.forEach(({ emociones }) => {
-    if (!Array.isArray(emociones)) return;
+  let totalDreams = 0;
 
-    emociones.forEach(emocionValue => {
+  (Array.isArray(records) ? records : []).forEach(record => {
+    const emocionesUnicas = new Set();
+
+    getRecordEmotions(record).forEach(emocionValue => {
       const emocion = normalizeEmotion(emocionValue);
-      if (conteo[emocion] !== undefined) {
-        conteo[emocion] += 1;
+      if (Object.prototype.hasOwnProperty.call(conteo, emocion)) {
+        emocionesUnicas.add(emocion);
       }
+    });
+
+    if (!emocionesUnicas.size) return;
+
+    totalDreams += 1;
+    emocionesUnicas.forEach(emocion => {
+      conteo[emocion] += 1;
     });
   });
 
-  const totalDreams = records.length;
   const chartData = FIXED_EMOTIONS.map(emocion => {
     const porcentaje = Math.round((conteo[emocion] / totalDreams) * 100) || 0;
     const grayValue = 255 - Math.round(porcentaje * 2.55);
@@ -59,6 +100,7 @@ export const buildEmotionChartData = (records) => {
     return {
       label: emocion,
       value: porcentaje,
+      count: conteo[emocion],
       frontColor: `rgb(${grayValue},${grayValue},${grayValue})`,
     };
   });

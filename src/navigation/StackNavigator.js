@@ -2,15 +2,14 @@ import React, { useState } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { View, TouchableOpacity, DeviceEventEmitter } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import Perfil from '../screens/Perfil';
 import SuenosGuardados from '../screens/SuenosGuardados';
-import Diario from '../screens/Diario';
 import HomeScreen from '../components/HomeScreen';
 import DiagramaEmocional from '../screens/DiagramaEmocional';
 import Configuracion from '../screens/Configuracion';
 import RestoreAnswersButton from '../components/RestoreAnswersButton';
 import DropdownMenu from '../components/DropdownMenu';
+import AppIcon from '../components/AppIcon';
 import { navigationRef } from '../utils/navigationRef';
 
 const Stack = createStackNavigator();
@@ -35,23 +34,18 @@ export default function StackNavigator({
   const handleCloseMenu = () => setMenuVisible(false);
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <DropdownMenu
-        isVisible={menuVisible}
-        onClose={handleCloseMenu}
-        signOut={signOut}
-      />
-
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{
-          headerStyle: {
-            elevation: 0,
-            shadowOpacity: 0,
-            borderBottomWidth: 0,
-          },
-        }}
-      >
+    <View style={{ flex: 1 }}>
+      <NavigationContainer ref={navigationRef}>
+        <Stack.Navigator
+          initialRouteName="Home"
+          screenOptions={{
+            headerStyle: {
+              elevation: 0,
+              shadowOpacity: 0,
+              borderBottomWidth: 0,
+            },
+          }}
+        >
         <Stack.Screen
           name="Home"
           options={{
@@ -59,9 +53,12 @@ export default function StackNavigator({
             headerLeft: () => (
               <TouchableOpacity
                 onPress={() => setMenuVisible(v => !v)}
-                style={{ marginLeft: 10 }}
+                accessibilityLabel="Abrir menu"
+                accessibilityRole="button"
+                hitSlop={8}
+                style={{ marginLeft: 10, padding: 8 }}
               >
-                <Ionicons name="menu" size={24} color="black" />
+                <AppIcon name="menu" size={24} color="black" />
               </TouchableOpacity>
             ),
             headerRight: () =>
@@ -71,13 +68,13 @@ export default function StackNavigator({
                     onPress={confirmNewInterpretation}
                     style={{ marginRight: 10, padding: 8 }}
                   >
-                    <Ionicons name="refresh" size={24} color="black" />
+                    <AppIcon name="refresh" size={24} color="black" />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={showInfoInterpretation}
                     style={{ marginRight: 10, padding: 8 }}
                   >
-                    <Ionicons name="information-circle-outline" size={24} color="black" />
+                    <AppIcon name="info" size={24} color="black" />
                   </TouchableOpacity>
                 </View>
               ),
@@ -108,7 +105,7 @@ export default function StackNavigator({
               <View style={{ flexDirection: 'row' }}>
                 <RestoreAnswersButton />
                 <TouchableOpacity onPress={showInfo} style={{ marginRight: 10, padding: 8 }}>
-                  <Ionicons name="information-circle-outline" size={24} color="black" />
+                  <AppIcon name="info" size={24} color="black" />
                 </TouchableOpacity>
               </View>
             ),
@@ -129,7 +126,7 @@ export default function StackNavigator({
                   onPress={() => DeviceEventEmitter.emit('toggleCalendarView')}
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <Ionicons name="calendar-outline" size={24} color="black" />
+                  <AppIcon name="calendar" size={24} color="black" />
                 </TouchableOpacity>
 
                 {/* Botón de borrar */}
@@ -137,7 +134,7 @@ export default function StackNavigator({
                   onPress={() => DeviceEventEmitter.emit('enableSelectionMode')}
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <Ionicons name="trash" size={24} color="black" />
+                  <AppIcon name="trash" size={24} color="black" />
                 </TouchableOpacity>
               </View>
             );
@@ -149,13 +146,13 @@ export default function StackNavigator({
                   onPress={() => DeviceEventEmitter.emit('cancelSelectionMode')}
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <Ionicons name="close" size={24} color="black" />
+                  <AppIcon name="close" size={24} color="black" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => DeviceEventEmitter.emit('confirmDeletion')}
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <Ionicons name="checkmark" size={24} color="black" />
+                  <AppIcon name="check" size={24} color="black" />
                 </TouchableOpacity>
               </View>
             );
@@ -168,7 +165,6 @@ export default function StackNavigator({
           }}
         />
 
-        <Stack.Screen name="Diario" component={Diario} />
         <Stack.Screen
           name="DiagramaEmocional"
           component={DiagramaEmocional}
@@ -179,7 +175,14 @@ export default function StackNavigator({
           component={Configuracion}
           options={{ title: 'Configuración' }}
         />
-      </Stack.Navigator>
-    </NavigationContainer>
+        </Stack.Navigator>
+      </NavigationContainer>
+
+      <DropdownMenu
+        isVisible={menuVisible}
+        onClose={handleCloseMenu}
+        signOut={signOut}
+      />
+    </View>
   );
 }

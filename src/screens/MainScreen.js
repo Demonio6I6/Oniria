@@ -20,7 +20,7 @@ import {
   obtenerEmocionesDesdeContexto,
 } from '../../openai';
 import Markdown from 'react-native-markdown-display';
-import { Ionicons } from '@expo/vector-icons';
+import AppIcon from '../components/AppIcon';
 import { GlobalContext } from '../GlobalContext';
 import {
   buildProfileContext,
@@ -434,7 +434,7 @@ export default function MainScreen() {
                 style={styles.newDreamButton}
                 onPress={reiniciarInterpretacion}
               >
-                <Ionicons name="refresh" size={18} color="#fff" />
+                <AppIcon name="refresh" size={18} color="#fff" />
                 <Text style={styles.newDreamButtonText}>
                   Nueva interpretación
                 </Text>
@@ -469,7 +469,7 @@ export default function MainScreen() {
               onPress={manejarEnvio}
               disabled={cicloCerrado || cargando}
             >
-              <Ionicons name="arrow-forward" size={24} color="#fff" />
+              <AppIcon name="send" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
         </TouchableWithoutFeedback>

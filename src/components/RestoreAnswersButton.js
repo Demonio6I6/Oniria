@@ -1,8 +1,8 @@
 // src/components/RestoreAnswersButton.js
 import React, { useContext } from 'react';
 import { Alert, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { GlobalContext } from '../GlobalContext';
+import AppIcon from './AppIcon';
 
 export default function RestoreAnswersButton() {
   const { clearRespuestas } = useContext(GlobalContext);
@@ -20,7 +20,7 @@ export default function RestoreAnswersButton() {
 
   return (
     <TouchableOpacity onPress={handlePress} style={{ marginRight: 10, padding: 8 }}>
-      <Ionicons name="refresh" size={24} color="black" />
+      <AppIcon name="refresh" size={24} color="black" />
     </TouchableOpacity>
   );
 }

@@ -9,7 +9,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
-import { Ionicons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons'; // o la librería de íconos que uses
+import AppIcon from './AppIcon';
 
 export default function DropdownMenu({ isVisible, onClose, signOut }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -70,7 +70,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('Perfil')}
           >
-            <Ionicons name="person-circle-outline" size={20} />
+            <AppIcon name="profile" size={20} />
             <Text style={styles.menuText}>Perfil</Text>
           </TouchableOpacity>
 
@@ -78,7 +78,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('SuenosGuardados')}
           >
-            <FontAwesome5 name="bookmark" size={20} />
+            <AppIcon name="bookmark" size={20} />
             <Text style={styles.menuText}>Sueños guardados</Text>
           </TouchableOpacity>
 
@@ -86,7 +86,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('DiagramaEmocional')}
           >
-            <MaterialCommunityIcons name="chart-areaspline" size={20} />
+            <AppIcon name="chart" size={20} />
             <Text style={styles.menuText}>Diagrama Emocional</Text>
           </TouchableOpacity>
 
@@ -94,7 +94,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('Configuracion')}
           >
-            <Ionicons name="settings-outline" size={20} />
+            <AppIcon name="settings" size={20} />
             <Text style={styles.menuText}>Configuración</Text>
           </TouchableOpacity>
 
@@ -112,7 +112,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
               });
             }}
           >
-            <Ionicons name="log-out-outline" size={20} />
+            <AppIcon name="logout" size={20} />
             <Text style={styles.menuText}>Cerrar sesión</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1000,
+    elevation: 1000,
   },
   menuContainer: {
     position: 'absolute',
@@ -134,6 +135,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
     elevation: 5,
+    zIndex: 1001,
     paddingVertical: 8,
   },
   menuItem: {

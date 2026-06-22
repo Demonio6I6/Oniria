@@ -2,24 +2,12 @@ import 'react-native-gesture-handler';
 import React from 'react';
 import { Alert, DeviceEventEmitter } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useFonts } from 'expo-font';
-import {
-  FontAwesome5,
-  Ionicons,
-  MaterialCommunityIcons,
-} from '@expo/vector-icons';
 import { GlobalProvider } from './GlobalContext';
 import { useAuth } from './auth/useAuth';
 import StackNavigator from './navigation/StackNavigator';
 import NotificationModal from './components/NotificationModal';
 
 export default function App() {
-  const [iconsLoaded, iconsLoadError] = useFonts({
-    ...Ionicons.font,
-    ...FontAwesome5.font,
-    ...MaterialCommunityIcons.font,
-  });
-
   const {
     user,
     loading,
@@ -62,7 +50,7 @@ export default function App() {
     alert('Cada interpretación toma en cuenta las respuestas de tu perfil');
   };
 
-  if (loading || (!iconsLoaded && !iconsLoadError)) {
+  if (loading) {
     return null;
   }
 

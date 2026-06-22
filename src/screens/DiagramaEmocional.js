@@ -7,8 +7,9 @@ import {
   TouchableOpacity,
   View,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
-import { BarChart } from 'react-native-gifted-charts';
+import { RadarChart } from 'react-native-gifted-charts';
 import Markdown from 'react-native-markdown-display';
 import { obtenerPatronEmocional } from '../../openai';
 import {
@@ -24,6 +25,20 @@ import { loadSavedDreams } from '../services/dreamRepository';
 import { loadEmotionRecords } from '../services/emotionRepository';
 
 const MAX_DREAMS_PER_ANALYSIS = 45;
+const RADAR_MAX_VALUE = 100;
+const RADAR_MAX_SIZE = 320;
+const RADAR_MIN_SIZE = 240;
+const EMOTION_LIST_LIMIT = 5;
+
+const formatPercent = (value) => `${Math.round(Number(value) || 0)}%`;
+
+const formatEmotionLabel = (label) =>
+  String(label || '').charAt(0).toUpperCase() + String(label || '').slice(1);
+
+const sortEmotionData = (a, b) =>
+  b.value - a.value ||
+  (b.count || 0) - (a.count || 0) ||
+  a.label.localeCompare(b.label, 'es');
 
 const getCurrentMonthPeriod = () => {
   const now = new Date();
@@ -38,12 +53,22 @@ const getCurrentMonthPeriod = () => {
 };
 
 export default function DiagramaEmocional() {
+  const { width } = useWindowDimensions();
   const [data, setData] = useState([]);
   const [selectedEmocion, setSelectedEmocion] = useState(null);
   const [cantidadSuenos, setCantidadSuenos] = useState(0);
   const [suenos, setSuenos] = useState([]);
   const [analisisMensual, setAnalisisMensual] = useState('');
   const [analizandoMensual, setAnalizandoMensual] = useState(false);
+  const chartSize = Math.max(
+    RADAR_MIN_SIZE,
+    Math.min(RADAR_MAX_SIZE, width - 56)
+  );
+  const orderedData = [...data].sort(sortEmotionData);
+  const relevantData = orderedData.filter(item => item.count > 0);
+  const visibleEmotionData = (
+    relevantData.length ? relevantData : orderedData
+  ).slice(0, EMOTION_LIST_LIMIT);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -67,23 +92,92 @@ export default function DiagramaEmocional() {
     cargarDatos();
   }, []);
 
-  const renderBarChart = () => (
-    <BarChart
-      data={data}
-      barWidth={40}
-      spacing={24}
-      roundedTop
-      roundedBottom
-      hideRules
-      yAxisTextStyle={{ color: '#333' }}
-      xAxisLabelTextStyle={{ color: '#333', fontSize: 12, flexWrap: 'wrap' }}
-      xAxisThickness={1}
-      xAxisColor="#ccc"
-      maxValue={100}
-      onPress={item => setSelectedEmocion(item.label)}
-      yAxisLabelTexts={['0%', '20%', '40%', '60%', '80%', '100%']}
-    />
-  );
+  const renderRadarChart = () => {
+    if (!data.length) return null;
+
+    return (
+      <View style={styles.chartSection}>
+        <RadarChart
+          data={data.map(item => item.value)}
+          labels={data.map(item => formatEmotionLabel(item.label))}
+          maxValue={RADAR_MAX_VALUE}
+          chartSize={chartSize}
+          noOfSections={5}
+          circular
+          labelsPositionOffset={8}
+          labelConfig={{
+            fontSize: 11,
+            stroke: '#333',
+            fontWeight: '600',
+          }}
+          gridConfig={{
+            stroke: '#ddd',
+            strokeWidth: 1,
+            fill: '#fff',
+            opacity: 0.12,
+          }}
+          asterLinesConfig={{
+            stroke: '#e6e6e6',
+            strokeWidth: 1,
+          }}
+          polygonConfig={{
+            stroke: '#111',
+            strokeWidth: 2,
+            fill: '#111',
+            opacity: 0.18,
+            showGradient: false,
+            isAnimated: true,
+          }}
+        />
+        <Text style={styles.chartNote}>
+          Cada eje muestra el porcentaje de sueños donde aparece esa emoción.
+          Un sueño puede incluir varias emociones.
+        </Text>
+      </View>
+    );
+  };
+
+  const renderEmotionBreakdown = () => {
+    if (!visibleEmotionData.length) return null;
+
+    return (
+      <View style={styles.breakdownSection}>
+        <Text style={styles.sectionTitle}>Emociones principales</Text>
+        {visibleEmotionData.map(item => {
+          const isSelected = selectedEmocion === item.label;
+
+          return (
+            <TouchableOpacity
+              key={item.label}
+              style={[
+                styles.emotionRow,
+                isSelected && styles.emotionRowSelected,
+              ]}
+              onPress={() => setSelectedEmocion(isSelected ? null : item.label)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.emotionRowHeader}>
+                <Text style={styles.emotionName}>
+                  {formatEmotionLabel(item.label)}
+                </Text>
+                <Text style={styles.emotionPercent}>
+                  {formatPercent(item.value)}
+                </Text>
+              </View>
+              <View style={styles.emotionTrack}>
+                <View
+                  style={[
+                    styles.emotionFill,
+                    { width: `${Math.min(item.value, RADAR_MAX_VALUE)}%` },
+                  ]}
+                />
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
 
   const getLecturaGeneral = () => {
     if (!cantidadSuenos) {
@@ -94,23 +188,20 @@ export default function DiagramaEmocional() {
       );
     }
 
-    const ordenadas = [...data].sort((a, b) => b.value - a.value);
+    const principal = relevantData[0];
+    const secundarias = relevantData.slice(1, 3);
+    const secundariasText = secundarias
+      .map(emocion => `${emocion.label} (${formatPercent(emocion.value)})`)
+      .join(' y ');
+
     return (
       <Text style={styles.detailText}>
-        En tus últimos {cantidadSuenos} sueños registrados aparece con más
-        frecuencia <Text style={styles.bold}>{ordenadas[0].label}</Text> con{' '}
-        {ordenadas[0].value}%.{' '}
-        {ordenadas.slice(1).map((emocion, index) => {
-          const intro =
-            index === ordenadas.length - 2
-              ? ' y con menor presencia aparece '
-              : index === 0
-                ? 'También aparece '
-                : ' después aparece ';
-
-          return `${intro}${emocion.label} con ${emocion.value}%`;
-        }).join(', ')}
-        .
+        En tus últimos {cantidadSuenos} sueños con emociones reconocidas destaca{' '}
+        <Text style={styles.bold}>{principal.label}</Text> con{' '}
+        {formatPercent(principal.value)}.{' '}
+        {secundariasText
+          ? `También aparecen ${secundariasText}.`
+          : 'Por ahora no hay otra emoción con presencia clara.'}
       </Text>
     );
   };
@@ -121,9 +212,18 @@ export default function DiagramaEmocional() {
     const emocion = data.find(item => item.label === selectedEmocion);
     if (!emocion) return null;
 
+    if (!emocion.count) {
+      return (
+        <Text style={styles.detailText}>
+          {formatEmotionLabel(emocion.label)} no aparece todavía en los sueños
+          con emociones reconocidas.
+        </Text>
+      );
+    }
+
     let mensaje =
       `En esta lectura orientativa, ${emocion.label} aparece en el ` +
-      `${emocion.value}% de tus sueños registrados. `;
+      `${formatPercent(emocion.value)} de tus sueños con emociones reconocidas. `;
 
     if (emocion.value >= 75) {
       mensaje +=
@@ -195,9 +295,10 @@ export default function DiagramaEmocional() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Tu Lectura Emocional</Text>
-      <Text style={styles.subtitle}>Sueños registrados: {cantidadSuenos}</Text>
+      <Text style={styles.subtitle}>Sueños analizados: {cantidadSuenos}</Text>
 
-      {renderBarChart()}
+      {renderRadarChart()}
+      {renderEmotionBreakdown()}
 
       {selectedEmocion ? getLecturaEmocion() : getLecturaGeneral()}
 
@@ -250,6 +351,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     color: '#666',
+  },
+  chartSection: {
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  chartNote: {
+    maxWidth: 320,
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#666',
+    textAlign: 'center',
+  },
+  breakdownSection: {
+    marginTop: 4,
+  },
+  emotionRow: {
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  emotionRowSelected: {
+    borderColor: '#111',
+    backgroundColor: '#f6f6f6',
+  },
+  emotionRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  emotionName: {
+    fontSize: 15,
+    color: '#222',
+    fontWeight: '600',
+  },
+  emotionPercent: {
+    fontSize: 15,
+    color: '#111',
+    fontWeight: '700',
+  },
+  emotionTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ededed',
+    overflow: 'hidden',
+  },
+  emotionFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#111',
   },
   detailText: {
     marginTop: 20,

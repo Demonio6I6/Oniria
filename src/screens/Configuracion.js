@@ -16,7 +16,7 @@ export default function Configuracion() {
   const handleClearLocalData = () => {
     Alert.alert(
       'Borrar datos locales',
-      'Se eliminaran de este dispositivo tus suenos, perfil, emociones, diario, contrasena del diario y preferencias de privacidad.',
+      'Se eliminaran de este dispositivo tus suenos, perfil, emociones y preferencias de privacidad.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
