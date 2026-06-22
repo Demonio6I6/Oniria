@@ -9,13 +9,13 @@ import { getFirestore } from 'firebase/firestore';
 
 // Configuración de Firebase
 const firebaseConfig = {
-  apiKey: 'AIzaSyDw8UnEfTp8emNxUFKy_D21DwzUeJaJ5hU',
-  authDomain: 'post-it-72f0b.firebaseapp.com',
-  projectId: 'post-it-72f0b',
-  storageBucket: 'post-it-72f0b.appspot.com',
-  messagingSenderId: '713716281775',
-  appId: '1:713716281775:web:33bc99cf83a3387e2fbf5a',
-  measurementId: 'G-PDPRV3B50R',
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Inicializar Firebase
