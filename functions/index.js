@@ -15,11 +15,14 @@ const {
 } = require("./openai");
 
 const REGION = "europe-west1";
+const PROJECT_ID = "post-it-72f0b";
+const ANONYMOUS_ACCOUNT_TTL_DAYS = 30;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
-  projectId: "post-it-72f0b",
+  projectId: PROJECT_ID,
 });
 
 function requireAuth(request) {
@@ -98,6 +101,124 @@ function readStringArray(data, key, options = {}) {
     }
     return item.trim();
   }).filter(Boolean);
+}
+
+function getSignInProvider(authToken) {
+  return authToken?.firebase?.sign_in_provider || "";
+}
+
+function isAnonymousAuthToken(authToken) {
+  return getSignInProvider(authToken) === "anonymous";
+}
+
+function isAnonymousUserRecord(userRecord) {
+  return Array.isArray(userRecord.providerData) &&
+    userRecord.providerData.length === 0;
+}
+
+function getConfiguredStorageBucketName() {
+  try {
+    const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG || "{}");
+    return firebaseConfig.storageBucket || "";
+  } catch (error) {
+    console.warn("No se pudo leer FIREBASE_CONFIG:", error);
+    return "";
+  }
+}
+
+function isNotFoundStorageError(error) {
+  const message = error?.message || "";
+  return error?.code === 404 ||
+    error?.code === "storage/bucket-not-found" ||
+    message.includes("Bucket name not specified") ||
+    message.includes("No such object") ||
+    message.includes("Not Found") ||
+    message.includes("not found");
+}
+
+async function touchUserActivity(uid, authToken) {
+  await admin.firestore()
+      .collection("users")
+      .doc(uid)
+      .set(
+          {
+            isAnonymous: isAnonymousAuthToken(authToken),
+            lastSeenAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          {merge: true},
+      );
+}
+
+async function deleteUserFirestoreTree(uid) {
+  const userRef = admin.firestore().collection("users").doc(uid);
+  await admin.firestore().recursiveDelete(userRef);
+}
+
+async function deleteUserStorageFiles(uid) {
+  const bucketName = getConfiguredStorageBucketName();
+  let bucket;
+
+  try {
+    bucket = bucketName ?
+      admin.storage().bucket(bucketName) :
+      admin.storage().bucket();
+
+    await bucket.deleteFiles({prefix: `users/${uid}/`});
+  } catch (error) {
+    if (isNotFoundStorageError(error)) {
+      console.warn(`No hay bucket/archivos de Storage para ${uid}.`);
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function deleteAuthUser(uid) {
+  try {
+    await admin.auth().deleteUser(uid);
+  } catch (error) {
+    if (error?.code === "auth/user-not-found") return;
+    throw error;
+  }
+}
+
+async function deleteAnonymousAccount(uid) {
+  await deleteUserFirestoreTree(uid);
+  await deleteUserStorageFiles(uid);
+  await deleteAuthUser(uid);
+}
+
+function getUserMetadataTime(userRecord) {
+  const rawTime = userRecord.metadata.lastSignInTime ||
+    userRecord.metadata.creationTime ||
+    "";
+  const time = Date.parse(rawTime);
+
+  return Number.isFinite(time) ? time : null;
+}
+
+function getTimestampMillis(timestamp) {
+  if (!timestamp) return null;
+  if (typeof timestamp.toMillis === "function") return timestamp.toMillis();
+  if (typeof timestamp === "number") return timestamp;
+  return null;
+}
+
+async function isStaleAnonymousUser(userRecord, cutoffMs) {
+  if (!isAnonymousUserRecord(userRecord)) return false;
+
+  const authTime = getUserMetadataTime(userRecord);
+  if (authTime && authTime >= cutoffMs) return false;
+
+  const userSnapshot = await admin.firestore()
+      .collection("users")
+      .doc(userRecord.uid)
+      .get();
+  const lastSeenAt = getTimestampMillis(userSnapshot.get("lastSeenAt"));
+
+  return !lastSeenAt || lastSeenAt < cutoffMs;
 }
 
 const getDreamSessionRef = (uid, dreamSessionId) =>
@@ -179,6 +300,12 @@ function aiFunction(handler) {
       },
       async (request) => {
         requireAuth(request);
+        await touchUserActivity(
+            request.auth.uid,
+            request.auth.token,
+        ).catch((error) => {
+          console.error("Error registrando actividad de usuario:", error);
+        });
 
         try {
           return await handler(
@@ -200,6 +327,38 @@ function aiFunction(handler) {
       },
   );
 }
+
+exports.deleteAnonymousUserData = onCall(
+    {
+      region: REGION,
+      timeoutSeconds: 120,
+    },
+    async (request) => {
+      requireAuth(request);
+
+      const userRecord = await admin.auth().getUser(request.auth.uid);
+      const isAnonymous = isAnonymousAuthToken(request.auth.token) ||
+        isAnonymousUserRecord(userRecord);
+
+      if (!isAnonymous) {
+        throw new HttpsError(
+            "permission-denied",
+            "Solo las cuentas invitadas pueden usar esta limpieza.",
+        );
+      }
+
+      try {
+        await deleteAnonymousAccount(request.auth.uid);
+        return {deleted: true};
+      } catch (error) {
+        console.error("Error borrando cuenta invitada:", error);
+        throw new HttpsError(
+            "internal",
+            "No se pudieron borrar los datos de la cuenta invitada.",
+        );
+      }
+    },
+);
 
 exports.interpretDream = aiFunction(async (data, apiKey, uid) => {
   const descripcion = readString(data, "descripcion", {
@@ -366,6 +525,51 @@ exports.dailyReflection = onSchedule(
       } catch (error) {
         console.error("Error al enviar notificaciones:", error);
       }
+
+      return null;
+    },
+);
+
+exports.cleanupStaleAnonymousUsers = onSchedule(
+    {
+      schedule: "every 24 hours",
+      timeZone: "UTC",
+      region: REGION,
+      timeoutSeconds: 540,
+    },
+    async () => {
+      const cutoffMs = Date.now() -
+        (ANONYMOUS_ACCOUNT_TTL_DAYS * DAY_IN_MS);
+      let pageToken;
+      let deletedCount = 0;
+
+      do {
+        const result = await admin.auth().listUsers(1000, pageToken);
+        pageToken = result.pageToken;
+
+        for (const userRecord of result.users) {
+          try {
+            const shouldDelete = await isStaleAnonymousUser(
+                userRecord,
+                cutoffMs,
+            );
+
+            if (!shouldDelete) continue;
+
+            await deleteAnonymousAccount(userRecord.uid);
+            deletedCount += 1;
+          } catch (error) {
+            console.error(
+                `Error limpiando invitado ${userRecord.uid}:`,
+                error,
+            );
+          }
+        }
+      } while (pageToken);
+
+      console.log(
+          `Cuentas invitadas antiguas borradas: ${deletedCount}.`,
+      );
 
       return null;
     },

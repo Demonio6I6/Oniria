@@ -1,6 +1,7 @@
 // src/components/DropdownMenu.js
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   TouchableOpacity,
@@ -11,13 +12,13 @@ import {
 import { navigationRef } from '../utils/navigationRef';
 import AppIcon from './AppIcon';
 
-export default function DropdownMenu({ isVisible, onClose, signOut }) {
+export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-10)).current;
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (isVisible) {
-      // fade in + slide down
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -31,7 +32,6 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
         }),
       ]).start();
     } else {
-      // fade out + slide up
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -45,11 +45,58 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
         }),
       ]).start();
     }
-  }, [isVisible]);
+  }, [fadeAnim, isVisible, translateY]);
 
   const handleNavigate = (screen) => {
     navigationRef.navigate(screen);
     onClose();
+  };
+
+  const completeSignOut = async () => {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+
+    try {
+      await signOut();
+      navigationRef.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    } catch (error) {
+      console.error('Error al cerrar sesion desde el menu:', error);
+      Alert.alert(
+        'No se pudo cerrar sesión',
+        user?.isAnonymous
+          ? 'No se pudieron borrar los datos de la cuenta invitada. Inténtalo de nuevo.'
+          : 'Inténtalo de nuevo.'
+      );
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  const handleSignOutPress = () => {
+    onClose();
+
+    if (!user?.isAnonymous) {
+      completeSignOut();
+      return;
+    }
+
+    Alert.alert(
+      'Salir como invitado',
+      'Esta cuenta invitada no se puede recuperar después. Al salir se borrarán sus datos locales y remotos.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Borrar y salir',
+          style: 'destructive',
+          onPress: completeSignOut,
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   if (!isVisible) return null;
@@ -102,15 +149,8 @@ export default function DropdownMenu({ isVisible, onClose, signOut }) {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => {
-              onClose();         // primero cierro el menú
-              signOut();         // luego ejecuto el logout
-              // opcional: reset para limpiar el stack y quirar "back"
-              navigationRef.reset({
-                index: 0,
-                routes: [{ name: 'Home' }], // o la pantalla de login si la tienes aparte
-              });
-            }}
+            onPress={handleSignOutPress}
+            disabled={isSigningOut}
           >
             <AppIcon name="logout" size={20} />
             <Text style={styles.menuText}>Cerrar sesión</Text>
@@ -129,8 +169,8 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     position: 'absolute',
-    top: 50,          // ajusta según la altura de tu header
-    left: 20,         // margen desde el borde izquierdo
+    top: 50,
+    left: 20,
     width: 200,
     backgroundColor: '#fff',
     borderRadius: 8,

@@ -14,7 +14,12 @@ import {
 import * as Notifications from 'expo-notifications';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth } from '../firebase/config';
-import { saveTokenInFirestore, registerForPushNotificationsAsync } from '../firebase/notification';
+import {
+  saveUserSessionInFirestore,
+  registerForPushNotificationsAsync,
+} from '../firebase/notification';
+import { deleteAnonymousAccountData } from '../services/anonymousAccountCleanup';
+import { clearUserLocalDataById } from '../services/userStorage';
 
 GoogleSignin.configure({
   webClientId: '713716281775-h6bc1cec3i5plmkn8bsmlicg3mm0a4u2.apps.googleusercontent.com',
@@ -44,8 +49,8 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    if (user && pushToken) {
-      saveTokenInFirestore(pushToken, user.uid);
+    if (user) {
+      saveUserSessionInFirestore(user, pushToken);
     }
   }, [user, pushToken]);
 
@@ -175,12 +180,29 @@ export function useAuth() {
   };
 
   const signOutUser = async () => {
+    const currentUser = auth.currentUser;
+    const anonymousUid = currentUser?.isAnonymous ? currentUser.uid : null;
+    let remoteAnonymousCleanupDone = false;
+
     try {
+      if (anonymousUid) {
+        await deleteAnonymousAccountData();
+        remoteAnonymousCleanupDone = true;
+        await clearUserLocalDataById(anonymousUid);
+      }
+
       await clearCurrentSession();
       setPhoneVerificationId(null);
       console.log('Usuario cerro sesion correctamente');
     } catch (error) {
       console.error('Error al cerrar sesion:', error);
+
+      if (remoteAnonymousCleanupDone) {
+        await clearCurrentSession();
+        setPhoneVerificationId(null);
+      }
+
+      throw error;
     }
   };
 

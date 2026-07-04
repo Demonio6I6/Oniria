@@ -87,8 +87,7 @@ export const readUserArray = async (keyFactory) => {
   return Array.isArray(storedValue) ? storedValue : [];
 };
 
-export const clearCurrentUserLocalData = async () => {
-  const uid = getCurrentUserId();
+export const clearUserLocalDataById = async (uid) => {
   if (!uid) return false;
 
   const storageKeys = [
@@ -101,3 +100,6 @@ export const clearCurrentUserLocalData = async () => {
   await deleteUserEncryptionKey(uid);
   return true;
 };
+
+export const clearCurrentUserLocalData = async () =>
+  clearUserLocalDataById(getCurrentUserId());

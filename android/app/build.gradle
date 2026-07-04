@@ -17,6 +17,16 @@ project.ext.vectoricons = [
 
 apply from: "../../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/fonts.gradle"
 
+afterEvaluate {
+    def fontCopyTask = tasks.findByName("copyReactNativeVectorIconFonts")
+
+    if (fontCopyTask) {
+        tasks.matching { it.name.startsWith("generate") && it.name.endsWith("LintVitalReportModel") }.configureEach {
+            dependsOn(fontCopyTask)
+        }
+    }
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.

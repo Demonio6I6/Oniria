@@ -50,6 +50,7 @@ export default function StackNavigator({
           name="Home"
           options={{
             title: 'Oniria',
+            headerShown: Boolean(user),
             headerLeft: () => (
               <TouchableOpacity
                 onPress={() => setMenuVisible(v => !v)}
@@ -179,9 +180,10 @@ export default function StackNavigator({
       </NavigationContainer>
 
       <DropdownMenu
-        isVisible={menuVisible}
+        isVisible={Boolean(user) && menuVisible}
         onClose={handleCloseMenu}
         signOut={signOut}
+        user={user}
       />
     </View>
   );

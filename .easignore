@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Expo/local output
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native build output and caches
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/**/build/
+android/**/.cxx/
+ios/Pods/
+ios/build/
+ios/DerivedData/
+
+# Local IDE/tooling state
+.agents/
+.codex/
+.history/
+.vscode/
+.idea/
+*.iml
+
+# Native/local machine files
+android/local.properties
+*.orig.*
+*.hprof
+*.jsbundle
+
+# Credentials and local environment
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.env
+.env.*
+.env*.local
+!.env.example
+
+# Logs and OS files
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.metro-health-check*
+.codex-expo-web.*.log
+.DS_Store
+Thumbs.db
+
+# Temporary inspection output
+.eas-inspect/

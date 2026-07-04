@@ -10,6 +10,7 @@ import {
   Keyboard,
   TouchableOpacity,
   Animated,
+  Easing,
   DeviceEventEmitter,
   Alert,
 } from 'react-native';
@@ -59,6 +60,75 @@ function AssistantMessage({ text, markdownStyle }) {
     <Animated.View style={{ opacity: fadeAnim }}>
       <Markdown style={markdownStyle}>{text}</Markdown>
     </Animated.View>
+  );
+}
+
+const TYPING_DOT_COUNT = 3;
+const TYPING_DOT_SIZE = 7;
+const TYPING_DOTS = Array.from({ length: TYPING_DOT_COUNT }, (_, index) => ({
+  key: `typing-dot-${index}`,
+}));
+
+function LoadingSpinner() {
+  const dotAnims = useRef(
+    TYPING_DOTS.map(() => new Animated.Value(0))
+  ).current;
+
+  useEffect(() => {
+    const animations = dotAnims.map((anim, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 120),
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 320,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: 320,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.delay((TYPING_DOT_COUNT - index - 1) * 120),
+        ])
+      )
+    );
+
+    animations.forEach(animation => animation.start());
+
+    return () => {
+      animations.forEach(animation => animation.stop());
+    };
+  }, [dotAnims]);
+
+  return (
+    <View style={styles.typingIndicator}>
+      {TYPING_DOTS.map((dot, index) => {
+        const opacity = dotAnims[index].interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.35, 1],
+        });
+        const translateY = dotAnims[index].interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -5],
+        });
+
+        return (
+          <Animated.View
+            key={dot.key}
+            style={[
+              styles.typingDot,
+              {
+                opacity,
+                transform: [{ translateY }],
+              },
+            ]}
+          />
+        );
+      })}
+    </View>
   );
 }
 
@@ -420,8 +490,8 @@ export default function MainScreen() {
           ))}
 
           {cargando && (
-            <View style={styles.message}>
-              <Text style={styles.messageText}>Cargando...</Text>
+            <View style={[styles.message, styles.loadingMessage]}>
+              <LoadingSpinner />
             </View>
           )}
 
@@ -443,8 +513,9 @@ export default function MainScreen() {
           )}
         </ScrollView>
 
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.fixedInputContainer}>
+        {!cicloCerrado && (
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.fixedInputContainer}>
             <TextInput
               style={[styles.input, { flex: 1, height: inputHeight }]}
               placeholder={
@@ -457,22 +528,23 @@ export default function MainScreen() {
               value={descripcion}
               onChangeText={setDescripcion}
               multiline
-              editable={!cicloCerrado && !cargando}
+              editable={!cargando}
               onContentSizeChange={handleContentSizeChange}
               selectionColor="black"
             />
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (cicloCerrado || cargando) && styles.sendButtonDisabled,
+                cargando && styles.sendButtonDisabled,
               ]}
               onPress={manejarEnvio}
-              disabled={cicloCerrado || cargando}
+              disabled={cargando}
             >
               <AppIcon name="send" size={24} color="#fff" />
             </TouchableOpacity>
-          </View>
-        </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -559,6 +631,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'System',
     color: '#333',
+  },
+  loadingMessage: {
+    alignItems: 'flex-start',
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: 0,
+    paddingVertical: 4,
+  },
+  typingIndicator: {
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 18,
+    flexDirection: 'row',
+    minHeight: 34,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    justifyContent: 'center',
+  },
+  typingDot: {
+    backgroundColor: '#333',
+    borderRadius: TYPING_DOT_SIZE / 2,
+    height: TYPING_DOT_SIZE,
+    marginHorizontal: 3,
+    width: TYPING_DOT_SIZE,
   },
   closedNotice: {
     alignItems: 'center',

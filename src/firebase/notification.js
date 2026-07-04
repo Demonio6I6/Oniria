@@ -2,14 +2,44 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from './config';
 import { Platform, Alert } from 'react-native';
 
-export async function saveTokenInFirestore(pushToken, uid) {
-  if (!pushToken) return;
+export async function saveUserSessionInFirestore(user, pushToken = null) {
+  if (!user?.uid) return;
+
+  const userPayload = {
+    isAnonymous: Boolean(user.isAnonymous),
+    lastSeenAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  if (pushToken) {
+    userPayload.fcmToken = pushToken;
+  }
+
   try {
-    await setDoc(doc(db, 'users', uid), { fcmToken: pushToken }, { merge: true });
+    await setDoc(doc(db, 'users', user.uid), userPayload, { merge: true });
+    console.log('Sesion de usuario guardada exitosamente en Firestore');
+  } catch (error) {
+    console.error('Error guardando la sesion en Firestore:', error);
+  }
+}
+
+export async function saveTokenInFirestore(pushToken, uid) {
+  if (!pushToken || !uid) return;
+
+  try {
+    await setDoc(
+      doc(db, 'users', uid),
+      {
+        fcmToken: pushToken,
+        lastSeenAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
     console.log('Token guardado exitosamente en Firestore');
   } catch (error) {
     console.error('Error guardando el token en Firestore:', error);
