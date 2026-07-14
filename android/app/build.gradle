@@ -109,9 +109,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.nicarao.oniria'
+    namespace 'com.nicarao.lunentra'
     defaultConfig {
-        applicationId 'com.nicarao.oniria'
+        applicationId 'com.nicarao.lunentra'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

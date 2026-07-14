@@ -24,6 +24,70 @@ const iconPaths = {
       <Line x1="12" y1="7" x2="12.01" y2="7" />
     </>
   ),
+  search: () => (
+    <>
+      <Circle cx="11" cy="11" r="6" />
+      <Line x1="16" y1="16" x2="20" y2="20" />
+    </>
+  ),
+  shield: () => (
+    <>
+      <Path d="M12 3l7 3v5c0 4.5-2.8 7.8-7 10-4.2-2.2-7-5.5-7-10V6l7-3z" />
+      <Polyline points="9 12 11 14 15 10" />
+    </>
+  ),
+  moon: ({ color }) => (
+    <Path
+      d="M19 15.5A8 8 0 0 1 8.5 5a8 8 0 1 0 10.5 10.5z"
+      fill={color}
+      stroke={color}
+    />
+  ),
+  google: () => (
+    <>
+      <Path d="M19.2 8.1a8 8 0 1 0 .3 7.9" />
+      <Path d="M20 12h-7" />
+      <Path d="M16.8 12v3.1" />
+    </>
+  ),
+  email: () => (
+    <>
+      <Rect x="4" y="6" width="16" height="12" rx="2" />
+      <Path d="M5 8l7 5 7-5" />
+    </>
+  ),
+  phone: () => (
+    <Path d="M7 4h3.3l1.4 4-2 1.1a11 11 0 0 0 5.2 5.2l1.1-2 4 1.4V17a3 3 0 0 1-3.2 3A14.5 14.5 0 0 1 4 7.2 3 3 0 0 1 7 4z" />
+  ),
+  guest: () => (
+    <>
+      <Path d="M6 11h12l-1.7-5H7.7L6 11z" />
+      <Circle cx="8.5" cy="15" r="2" />
+      <Circle cx="15.5" cy="15" r="2" />
+      <Path d="M10.5 15h3" />
+    </>
+  ),
+  chevronUp: () => <Polyline points="6 14 12 8 18 14" />,
+  chevronDown: () => <Polyline points="6 10 12 16 18 10" />,
+  arrowRight: () => (
+    <>
+      <Path d="M5 12h14" />
+      <Path d="M13 6l6 6-6 6" />
+    </>
+  ),
+  alertCircle: () => (
+    <>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M12 7v6" />
+      <Path d="M12 17h.01" />
+    </>
+  ),
+  checkCircle: () => (
+    <>
+      <Circle cx="12" cy="12" r="9" />
+      <Polyline points="8 12.5 11 15.5 16.5 9" />
+    </>
+  ),
   calendar: () => (
     <>
       <Rect x="4" y="5" width="16" height="15" rx="2" />

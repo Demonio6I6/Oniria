@@ -47,3 +47,4 @@ android/app/google-services.json
 .history/
 .vscode/
 .codex-expo-web.*.log
+.codex-remote-attachments/

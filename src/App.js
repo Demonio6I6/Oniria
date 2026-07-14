@@ -6,6 +6,9 @@ import { GlobalProvider } from './GlobalContext';
 import { useAuth } from './auth/useAuth';
 import StackNavigator from './navigation/StackNavigator';
 import NotificationModal from './components/NotificationModal';
+import PremiumPaywallModal from './components/PremiumPaywallModal';
+import { SubscriptionContext } from './subscriptions/SubscriptionContext';
+import { useSubscriptionState } from './subscriptions/useSubscriptionState';
 
 export default function App() {
   const {
@@ -23,18 +26,20 @@ export default function App() {
     modalVisible,
     setModalVisible,
     notificationMessage,
+    enableNotifications,
   } = useAuth();
+  const subscription = useSubscriptionState(user);
 
   const showInfo = () => {
     alert(
-      'Entre más detallado se responda a estas preguntas, más precisas serán las interpretaciones de sueños'
+      'Estas respuestas son opcionales. Ayudan a que Lunentra tenga en cuenta tu momento personal en lugar de usar significados genéricos.'
     );
   };
 
   const confirmNewInterpretation = () => {
     Alert.alert(
-      'Iniciar nueva interpretación',
-      '¿Desea iniciar una nueva interpretación? Se borrará la conversación actual.',
+      'Registrar otro sueño',
+      '¿Quieres empezar un nuevo registro? Se cerrará la exploración actual.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -47,7 +52,9 @@ export default function App() {
   };
 
   const showInfoInterpretation = () => {
-    alert('Cada interpretación toma en cuenta las respuestas de tu perfil');
+    alert(
+      'Cada lectura es orientativa y puede tener en cuenta tu contexto personal. Tú decides qué parte te resulta útil.'
+    );
   };
 
   if (loading) {
@@ -56,29 +63,34 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <GlobalProvider userId={user?.uid}>
-        <StackNavigator
-          user={user}
-          signInWithGoogle={signInWithGoogle}
-          signInWithEmail={signInWithEmail}
-          registerWithEmail={registerWithEmail}
-          resetPassword={resetPassword}
-          sendPhoneVerificationCode={sendPhoneVerificationCode}
-          confirmPhoneVerificationCode={confirmPhoneVerificationCode}
-          phoneVerificationId={phoneVerificationId}
-          signInAsGuest={signInAsGuest}
-          signOut={signOut}
-          showInfo={showInfo}
-          showInfoInterpretation={showInfoInterpretation}
-          confirmNewInterpretation={confirmNewInterpretation}
-        />
+      <SubscriptionContext.Provider value={subscription}>
+        <GlobalProvider userId={user?.uid}>
+          <StackNavigator
+            user={user}
+            signInWithGoogle={signInWithGoogle}
+            signInWithEmail={signInWithEmail}
+            registerWithEmail={registerWithEmail}
+            resetPassword={resetPassword}
+            sendPhoneVerificationCode={sendPhoneVerificationCode}
+            confirmPhoneVerificationCode={confirmPhoneVerificationCode}
+            phoneVerificationId={phoneVerificationId}
+            signInAsGuest={signInAsGuest}
+            signOut={signOut}
+            showInfo={showInfo}
+            showInfoInterpretation={showInfoInterpretation}
+            confirmNewInterpretation={confirmNewInterpretation}
+            enableNotifications={enableNotifications}
+          />
 
-        <NotificationModal
-          visible={modalVisible}
-          message={notificationMessage}
-          onClose={() => setModalVisible(false)}
-        />
-      </GlobalProvider>
+          <PremiumPaywallModal subscription={subscription} />
+
+          <NotificationModal
+            visible={modalVisible}
+            message={notificationMessage}
+            onClose={() => setModalVisible(false)}
+          />
+        </GlobalProvider>
+      </SubscriptionContext.Provider>
     </GestureHandlerRootView>
   );
 }

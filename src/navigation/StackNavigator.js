@@ -5,8 +5,10 @@ import { View, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import Perfil from '../screens/Perfil';
 import SuenosGuardados from '../screens/SuenosGuardados';
 import HomeScreen from '../components/HomeScreen';
+import MainScreen from '../screens/MainScreen';
 import DiagramaEmocional from '../screens/DiagramaEmocional';
 import Configuracion from '../screens/Configuracion';
+import PlanPremium from '../screens/PlanPremium';
 import RestoreAnswersButton from '../components/RestoreAnswersButton';
 import DropdownMenu from '../components/DropdownMenu';
 import AppIcon from '../components/AppIcon';
@@ -28,6 +30,7 @@ export default function StackNavigator({
   showInfo,
   showInfoInterpretation,
   confirmNewInterpretation,
+  enableNotifications,
 }) {
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -49,7 +52,7 @@ export default function StackNavigator({
         <Stack.Screen
           name="Home"
           options={{
-            title: 'Oniria',
+            title: 'Lunentra',
             headerShown: Boolean(user),
             headerLeft: () => (
               <TouchableOpacity
@@ -62,23 +65,6 @@ export default function StackNavigator({
                 <AppIcon name="menu" size={24} color="black" />
               </TouchableOpacity>
             ),
-            headerRight: () =>
-              user && (
-                <View style={{ flexDirection: 'row' }}>
-                  <TouchableOpacity
-                    onPress={confirmNewInterpretation}
-                    style={{ marginRight: 10, padding: 8 }}
-                  >
-                    <AppIcon name="refresh" size={24} color="black" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={showInfoInterpretation}
-                    style={{ marginRight: 10, padding: 8 }}
-                  >
-                    <AppIcon name="info" size={24} color="black" />
-                  </TouchableOpacity>
-                </View>
-              ),
           }}
         >
           {props => (
@@ -98,10 +84,36 @@ export default function StackNavigator({
         </Stack.Screen>
 
         <Stack.Screen
+          name="NuevoSueno"
+          component={MainScreen}
+          options={{
+            title: 'Explorar un sueño',
+            headerRight: () => (
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity
+                  onPress={confirmNewInterpretation}
+                  accessibilityLabel="Reiniciar registro"
+                  style={{ marginRight: 6, padding: 8 }}
+                >
+                  <AppIcon name="refresh" size={22} color="black" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={showInfoInterpretation}
+                  accessibilityLabel="Información de la lectura"
+                  style={{ marginRight: 10, padding: 8 }}
+                >
+                  <AppIcon name="info" size={22} color="black" />
+                </TouchableOpacity>
+              </View>
+            ),
+          }}
+        />
+
+        <Stack.Screen
           name="Perfil"
           component={Perfil}
           options={{
-            title: 'Perfil',
+            title: 'Mi contexto',
             headerRight: () => (
               <View style={{ flexDirection: 'row' }}>
                 <RestoreAnswersButton />
@@ -159,7 +171,7 @@ export default function StackNavigator({
             );
 
             return {
-              title: 'Sueños Guardados',
+              title: 'Mi diario',
               headerRight: () =>
                 selectionMode ? renderSelectionHeader() : renderNormalHeader(),
             };
@@ -169,13 +181,49 @@ export default function StackNavigator({
         <Stack.Screen
           name="DiagramaEmocional"
           component={DiagramaEmocional}
-          options={{ title: 'Diagrama Emocional' }}
+          options={{ title: 'Mis patrones' }}
+        />
+        <Stack.Screen
+          name="Cuenta"
+          options={{ title: 'Cuenta' }}
+        >
+          {props => (
+            <HomeScreen
+              {...props}
+              user={user}
+              signInWithGoogle={signInWithGoogle}
+              signInWithEmail={signInWithEmail}
+              registerWithEmail={registerWithEmail}
+              resetPassword={resetPassword}
+              sendPhoneVerificationCode={sendPhoneVerificationCode}
+              confirmPhoneVerificationCode={confirmPhoneVerificationCode}
+              phoneVerificationId={phoneVerificationId}
+              signInAsGuest={signInAsGuest}
+              forceAuthOptions
+              allowGuest={false}
+              panelTitle="Crea tu cuenta"
+              panelSubtitle="Desbloquea tus lecturas gratuitas restantes y continúa donde estabas."
+              heroTitle="Haz permanente tu espacio personal."
+              heroText="Tus registros seguirán protegidos en este dispositivo y podrás profundizar en tus lecturas."
+            />
+          )}
+        </Stack.Screen>
+        <Stack.Screen
+          name="PlanPremium"
+          component={PlanPremium}
+          options={{ title: 'Plan y Premium' }}
         />
         <Stack.Screen
           name="Configuracion"
-          component={Configuracion}
-          options={{ title: 'Configuración' }}
-        />
+          options={{ title: 'Privacidad y control' }}
+        >
+          {props => (
+            <Configuracion
+              {...props}
+              enableNotifications={enableNotifications}
+            />
+          )}
+        </Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
 

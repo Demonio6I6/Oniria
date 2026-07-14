@@ -15,7 +15,7 @@ export const buildFullDreamInterpretation = ({
 
   if (followUpQuestion || followUpAnswer) {
     sections.push([
-      '## Ampliación',
+      '## Profundización',
       followUpQuestion ? `**Consulta:** ${followUpQuestion.trim()}` : '',
       followUpAnswer?.trim() || '',
     ].filter(Boolean).join('\n\n'));
@@ -75,6 +75,7 @@ export const buildDreamAnalysisText = (dream) => {
   const timestamp = getDreamTimestamp(dream);
   const date = timestamp ? formatDateKey(timestamp) : 'sin fecha';
   const emotions = Array.isArray(dream?.emotions) ? dream.emotions : [];
+  const interpretation = getDreamInterpretation(dream);
 
   return [
     `Fecha: ${date}`,
@@ -82,8 +83,20 @@ export const buildDreamAnalysisText = (dream) => {
     dream?.description
       ? `Sueno contado: ${truncateText(dream.description, 700)}`
       : '',
+    dream?.wakingEmotion
+      ? `Emocion indicada al despertar: ${dream.wakingEmotion}`
+      : '',
+    dream?.wakingContext
+      ? `Asociacion personal: ${truncateText(dream.wakingContext, 400)}`
+      : '',
     emotions.length ? `Emociones detectadas: ${emotions.join(', ')}` : '',
-    `Interpretacion guardada: ${truncateText(getDreamInterpretation(dream), 1100)}`,
+    interpretation
+      ? `Interpretacion guardada: ${truncateText(interpretation, 1100)}`
+      : '',
+    dream?.resonance ? `Valoracion de la lectura: ${dream.resonance}` : '',
+    dream?.personalReflection
+      ? `Reflexion personal: ${truncateText(dream.personalReflection, 500)}`
+      : '',
   ].filter(Boolean).join('\n');
 };
 

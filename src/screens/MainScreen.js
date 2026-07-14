@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
   Animated,
@@ -44,6 +43,8 @@ import {
   acceptAiPrivacyNotice,
   hasAcceptedAiPrivacyNotice,
 } from '../services/privacyRepository';
+import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
+import { trackProductEvent } from '../services/productAnalytics';
 
 function AssistantMessage({ text, markdownStyle }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -138,6 +139,21 @@ const INTERACTION_STEPS = {
   CLOSED: 'closed',
 };
 
+const WAKING_EMOTIONS = [
+  'calma',
+  'alegría',
+  'miedo',
+  'tristeza',
+  'ansiedad',
+  'confusión',
+];
+
+const RESONANCE_OPTIONS = [
+  { value: 'yes', label: 'Me resonó' },
+  { value: 'partial', label: 'En parte' },
+  { value: 'no', label: 'No me representa' },
+];
+
 const guardarRegistroSueno = async ({
   dreamId: providedDreamId,
   timestamp: providedTimestamp,
@@ -145,6 +161,9 @@ const guardarRegistroSueno = async ({
   interpretacion,
   contextoPerfil,
   profileSnapshot,
+  wakingEmotion,
+  wakingContext,
+  updateExisting = false,
 }) => {
   try {
     const timestamp = providedTimestamp || Date.now();
@@ -152,11 +171,15 @@ const guardarRegistroSueno = async ({
     const dateKey = formatDateKey(timestamp);
 
     const [resumen, emocionesDetectadas] = await Promise.all([
-      obtenerResumenInterpretacion(interpretacion).catch(error => {
+      obtenerResumenInterpretacion(interpretacion, dreamId).catch(error => {
         console.error('Error al resumir el sueño:', error);
         return createFallbackSummary(descripcion);
       }),
-      obtenerEmocionesDesdeContexto(descripcion, contextoPerfil).catch(error => {
+      obtenerEmocionesDesdeContexto(
+        descripcion,
+        contextoPerfil,
+        dreamId
+      ).catch(error => {
         console.error('Error extrayendo emociones:', error);
         return [];
       }),
@@ -166,7 +189,7 @@ const guardarRegistroSueno = async ({
 
     const nuevoSueno = {
       id: dreamId,
-      schemaVersion: 3,
+      schemaVersion: 4,
       description: descripcion,
       initialInterpretation: interpretacion,
       fullInterpretation: interpretacion,
@@ -177,6 +200,10 @@ const guardarRegistroSueno = async ({
       summary: resumen,
       emotions: emociones,
       profileSnapshot,
+      wakingEmotion: wakingEmotion || '',
+      wakingContext: wakingContext || '',
+      personalReflection: '',
+      resonance: '',
       interactionStatus: 'follow_up_available',
       promptVersion: 'dream_consultant_v2',
       timestamp,
@@ -184,7 +211,11 @@ const guardarRegistroSueno = async ({
       dateKey,
     };
 
-    await saveDreamRecord(nuevoSueno);
+    if (updateExisting) {
+      await updateDreamRecordById(dreamId, nuevoSueno);
+    } else {
+      await saveDreamRecord(nuevoSueno);
+    }
 
     if (emociones.length > 0) {
       await appendEmotionRecord({
@@ -201,6 +232,54 @@ const guardarRegistroSueno = async ({
     console.error('Error al guardar el sueño:', error);
     return null;
   }
+};
+
+const guardarRegistroManual = async ({
+  descripcion,
+  profileSnapshot,
+  wakingEmotion,
+  wakingContext,
+}) => {
+  const timestamp = Date.now();
+  const dreamId = createDreamId(timestamp);
+  const dateKey = formatDateKey(timestamp);
+  const emociones = normalizeDreamEmotions(
+    wakingEmotion ? [wakingEmotion] : []
+  );
+  const record = {
+    id: dreamId,
+    schemaVersion: 4,
+    description: descripcion,
+    initialInterpretation: '',
+    fullInterpretation: '',
+    conversation: buildDreamConversation({ description: descripcion }),
+    summary: createFallbackSummary(descripcion),
+    emotions: emociones,
+    profileSnapshot,
+    wakingEmotion: wakingEmotion || '',
+    wakingContext: wakingContext || '',
+    personalReflection: '',
+    resonance: '',
+    interactionStatus: 'manual_saved',
+    promptVersion: 'manual_v1',
+    timestamp,
+    createdAt: timestamp,
+    dateKey,
+  };
+
+  await saveDreamRecord(record);
+
+  if (emociones.length > 0) {
+    await appendEmotionRecord({
+      dreamId,
+      emociones,
+      timestamp,
+      dateKey,
+      source: 'manual_record_v1',
+    });
+  }
+
+  return record;
 };
 
 const actualizarRegistroSuenoConAmpliacion = async ({
@@ -221,7 +300,7 @@ const actualizarRegistroSuenoConAmpliacion = async ({
 
   try {
     return await updateDreamRecordById(dreamId, dream => ({
-      schemaVersion: 3,
+      schemaVersion: 4,
       initialInterpretation:
         dream.initialInterpretation || initialInterpretation,
       fullInterpretation,
@@ -284,8 +363,93 @@ const confirmarPrivacidadIA = async () => {
   });
 };
 
-export default function MainScreen() {
+const getFunctionErrorCode = (error) =>
+  String(error?.code || '').replace(/^functions\//, '');
+
+const getFunctionErrorDetails = (error) =>
+  error?.details || error?.customData?.details || {};
+
+const formatRetryAt = (retryAt) => {
+  if (!retryAt) return '';
+
+  const date = new Date(retryAt);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleString([], {
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const buildInterpretationErrorMessage = (error, isInitialInteraction) => {
+  const code = getFunctionErrorCode(error);
+  const details = getFunctionErrorDetails(error);
+
+  if (code === 'failed-precondition' && details.reason === 'account-required') {
+    return 'Crea una cuenta para conservar tus suenos y continuar con esta lectura.';
+  }
+
+  if (code === 'resource-exhausted' && isInitialInteraction) {
+    if (details.reason === 'interpretation-in-progress') {
+      return 'Ya hay una interpretacion en curso. Espera un momento antes de intentar otra vez.';
+    }
+
+    if (details.reason === 'guest-demo-used') {
+      return 'Ya usaste tu interpretacion demo como invitado. Crea una cuenta para continuar.';
+    }
+
+    if (details.reason === 'free-interpretation-limit') {
+      return 'Ya usaste tus interpretaciones gratuitas. Premium desbloquea nuevas lecturas.';
+    }
+
+    if (details.reason === 'premium-required') {
+      return 'Esta lectura requiere Lunentra Premium.';
+    }
+
+    if (details.reason === 'premium-monthly-limit') {
+      return 'Ya usaste las lecturas Premium incluidas este mes.';
+    }
+
+    if (details.reason === 'premium-daily-limit') {
+      const retryAt = details.retryAt || details.retryAtMillis;
+      const formattedRetryAt = formatRetryAt(retryAt);
+      return formattedRetryAt
+        ? `Alcanzaste el límite operativo de hoy. Disponible de nuevo ${formattedRetryAt}.`
+        : 'Alcanzaste el límite operativo de lecturas Premium de hoy.';
+    }
+
+    const retryAt = details.retryAt || details.retryAtMillis;
+    const formattedRetryAt = formatRetryAt(retryAt);
+
+    return formattedRetryAt
+      ? `Ya usaste tu interpretacion disponible. Podras pedir otra a partir de ${formattedRetryAt}.`
+      : 'Ya usaste tu interpretacion disponible por hoy. Podras pedir otra mas adelante.';
+  }
+
+  if (code === 'resource-exhausted') {
+    return 'Esta interpretacion ya alcanzo su limite de ampliacion.';
+  }
+
+  return 'Hubo un error al obtener la interpretacion.';
+};
+
+const getPaywallReasonFromError = (error) => {
+  const details = getFunctionErrorDetails(error);
+
+  if (details.reason === 'account-required') return 'account-required';
+  if (details.reason === 'guest-demo-used') return 'guest-demo-used';
+  if (details.reason === 'free-interpretation-limit') {
+    return 'free-interpretation-limit';
+  }
+  if (details.reason === 'premium-required') return 'premium-required';
+
+  return '';
+};
+
+export default function MainScreen({ navigation, route }) {
   const { respuestas } = useContext(GlobalContext);
+  const subscription = useSubscriptionAccess();
   const [descripcion, setDescripcion] = useState('');
   const [messages, setMessages] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -293,7 +457,16 @@ export default function MainScreen() {
     INTERACTION_STEPS.INITIAL
   );
   const [activeDream, setActiveDream] = useState(null);
+  const [followUpInputVisible, setFollowUpInputVisible] = useState(false);
   const [inputHeight, setInputHeight] = useState(50);
+  const [wakingEmotion, setWakingEmotion] = useState('');
+  const [wakingContext, setWakingContext] = useState('');
+  const [reflectionDraft, setReflectionDraft] = useState('');
+  const [resonance, setResonance] = useState('');
+  const [reflectionStatus, setReflectionStatus] = useState('');
+  const [savedWithoutAi, setSavedWithoutAi] = useState(false);
+  const [sourceManualDreamId, setSourceManualDreamId] = useState('');
+  const [sourceManualDreamTimestamp, setSourceManualDreamTimestamp] = useState(0);
 
   const scrollViewRef = useRef(null);
 
@@ -301,18 +474,62 @@ export default function MainScreen() {
     setMessages([]);
     setInteractionStep(INTERACTION_STEPS.INITIAL);
     setActiveDream(null);
+    setFollowUpInputVisible(false);
     setDescripcion('');
     setInputHeight(50);
+    setWakingEmotion('');
+    setWakingContext('');
+    setReflectionDraft('');
+    setResonance('');
+    setReflectionStatus('');
+    setSavedWithoutAi(false);
+    setSourceManualDreamId('');
+    setSourceManualDreamTimestamp(0);
     scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   };
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener('newInterpretation', () => {
+    const newInterpretationSubscription = DeviceEventEmitter.addListener('newInterpretation', () => {
       reiniciarInterpretacion();
     });
+    const accountConversionSubscription = DeviceEventEmitter.addListener(
+      'accountConversionCompleted',
+      event => {
+        subscription.refresh();
+        if (event?.reason === 'guest-follow-up') {
+          setFollowUpInputVisible(true);
+          setInputHeight(54);
+          setTimeout(() => {
+            scrollViewRef.current?.scrollToEnd({ animated: true });
+          }, 120);
+        }
+      }
+    );
 
-    return () => subscription.remove();
-  }, []);
+    return () => {
+      newInterpretationSubscription.remove();
+      accountConversionSubscription.remove();
+    };
+  }, [subscription.refresh]);
+
+  useEffect(() => {
+    const manualDream = route?.params?.manualDream;
+    if (!manualDream?.id || !manualDream?.description) return;
+
+    setMessages([]);
+    setInteractionStep(INTERACTION_STEPS.INITIAL);
+    setActiveDream(null);
+    setFollowUpInputVisible(false);
+    setDescripcion(manualDream.description);
+    setWakingEmotion(manualDream.wakingEmotion || '');
+    setWakingContext(manualDream.wakingContext || '');
+    setSourceManualDreamId(manualDream.id);
+    setSourceManualDreamTimestamp(
+      manualDream.createdAt || manualDream.timestamp || 0
+    );
+    setSavedWithoutAi(false);
+    navigation.setParams({ manualDream: undefined });
+  }, [navigation, route?.params?.manualDream]);
 
   const manejarEnvio = async () => {
     if (cargando || interactionStep === INTERACTION_STEPS.CLOSED) return;
@@ -320,6 +537,40 @@ export default function MainScreen() {
     Keyboard.dismiss();
     const currentDescription = descripcion.trim();
     if (!currentDescription) return;
+
+    const esPrimeraInteraccion =
+      interactionStep === INTERACTION_STEPS.INITIAL;
+
+    if (esPrimeraInteraccion) {
+      const access = subscription.accessStatus?.interpretations;
+      const blockedReason = access?.blockedReason || '';
+
+      if (blockedReason === 'guest-demo-used') {
+        subscription.showPaywall('guest-demo-used');
+        return;
+      }
+
+      if (blockedReason === 'free-interpretation-limit') {
+        subscription.showPaywall('free-interpretation-limit');
+        return;
+      }
+
+      if (blockedReason) {
+        const retryLabel = formatRetryAt(access?.retryAtMillis);
+        Alert.alert(
+          'Lectura no disponible',
+          retryLabel
+            ? `Podrás volver a usar una lectura ${retryLabel}.`
+            : 'Has alcanzado el límite de lecturas disponible para tu plan.'
+        );
+        return;
+      }
+    }
+
+    if (!esPrimeraInteraccion && subscription.isGuest) {
+      subscription.showPaywall('guest-follow-up');
+      return;
+    }
 
     const privacidadAceptada = await confirmarPrivacidadIA();
     if (!privacidadAceptada) return;
@@ -330,20 +581,32 @@ export default function MainScreen() {
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setDescripcion('');
     setInputHeight(50);
+    if (!esPrimeraInteraccion) {
+      setFollowUpInputVisible(false);
+    }
     setCargando(true);
 
     try {
       let resultado;
-      const esPrimeraInteraccion =
-        interactionStep === INTERACTION_STEPS.INITIAL;
-      const initialTimestamp = esPrimeraInteraccion ? Date.now() : null;
+      const initialTimestamp = esPrimeraInteraccion
+        ? sourceManualDreamTimestamp || Date.now()
+        : null;
       const dreamSessionId = esPrimeraInteraccion
-        ? createDreamId(initialTimestamp)
+        ? sourceManualDreamId || createDreamId(initialTimestamp)
         : activeDream?.id || '';
       const profileSnapshot = esPrimeraInteraccion
         ? buildProfileSnapshot(respuestas)
         : activeDream?.profileSnapshot || buildProfileSnapshot(respuestas);
-      const contextoPerfil = buildProfileContext(profileSnapshot);
+      const contextoPerfilBase = buildProfileContext(profileSnapshot);
+      const contextoPerfil = [
+        contextoPerfilBase,
+        esPrimeraInteraccion && wakingEmotion
+          ? `Emocion indicada por el usuario al despertar: ${wakingEmotion}`
+          : '',
+        esPrimeraInteraccion && wakingContext.trim()
+          ? `Asociacion personal del usuario con su vida actual: ${wakingContext.trim()}`
+          : '',
+      ].filter(Boolean).join('\n\n');
       const contextoConversacion = mensajesPrevios
         .map(msg => `${msg.role}: ${msg.text}`)
         .join('\n');
@@ -377,6 +640,9 @@ export default function MainScreen() {
           interpretacion: resultado,
           contextoPerfil,
           profileSnapshot,
+          wakingEmotion,
+          wakingContext: wakingContext.trim(),
+          updateExisting: Boolean(sourceManualDreamId),
         });
 
         setActiveDream({
@@ -384,8 +650,17 @@ export default function MainScreen() {
           description: currentDescription,
           initialInterpretation: resultado,
           profileSnapshot,
+          wakingEmotion,
+          wakingContext: wakingContext.trim(),
         });
+        setFollowUpInputVisible(false);
         setInteractionStep(INTERACTION_STEPS.FOLLOW_UP);
+        setSourceManualDreamId('');
+        setSourceManualDreamTimestamp(0);
+        subscription.refresh();
+        if (subscription.isGuest) {
+          trackProductEvent('guest_demo_completed');
+        }
       } else {
         const firstUserMessage =
           activeDream?.description ||
@@ -409,19 +684,123 @@ export default function MainScreen() {
       console.error('Error al obtener la interpretación:', error);
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'assistant', text: 'Hubo un error al obtener la interpretación.' },
+        {
+          role: 'assistant',
+          text: buildInterpretationErrorMessage(error, esPrimeraInteraccion),
+        },
       ]);
+
+      const paywallReason = getPaywallReasonFromError(error);
+      if (paywallReason) {
+        setTimeout(() => subscription.showPaywall(paywallReason), 250);
+      }
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const guardarSinInterpretacion = async () => {
+    const currentDescription = descripcion.trim();
+    if (!currentDescription || cargando) return;
+
+    Keyboard.dismiss();
+    setCargando(true);
+
+    try {
+      const profileSnapshot = buildProfileSnapshot(respuestas);
+      const record = await guardarRegistroManual({
+        descripcion: currentDescription,
+        profileSnapshot,
+        wakingEmotion,
+        wakingContext: wakingContext.trim(),
+      });
+
+      setActiveDream({
+        id: record.id,
+        description: currentDescription,
+        initialInterpretation: '',
+        profileSnapshot,
+        wakingEmotion,
+        wakingContext: wakingContext.trim(),
+      });
+      setMessages([
+        { role: 'user', text: currentDescription },
+        {
+          role: 'assistant',
+          text: 'Tu sueño quedó guardado sin usar una lectura de IA. Puedes interpretarlo más adelante desde Mi diario.',
+        },
+      ]);
+      setDescripcion('');
+      setSavedWithoutAi(true);
+      setInteractionStep(INTERACTION_STEPS.CLOSED);
+      trackProductEvent('manual_dream_saved', {
+        accountType: subscription.isGuest ? 'guest' :
+          subscription.isPremium ? 'premium' : 'free',
+      });
+    } catch (error) {
+      console.error('Error guardando el sueño sin IA:', error);
+      Alert.alert('No se pudo guardar', 'Inténtalo de nuevo en unos segundos.');
     } finally {
       setCargando(false);
     }
   };
 
   const handleContentSizeChange = (event) => {
-    const { contentSize } = event.nativeEvent;
-    if (contentSize.height <= 100) {
-      setInputHeight(50);
-    } else {
-      setInputHeight(contentSize.height);
+    const { height } = event.nativeEvent.contentSize;
+    const minHeight =
+      interactionStep === INTERACTION_STEPS.INITIAL ? 170 : 54;
+    const maxHeight =
+      interactionStep === INTERACTION_STEPS.INITIAL ? 260 : 128;
+
+    setInputHeight(Math.min(Math.max(height, minHeight), maxHeight));
+  };
+
+  const handleOpenFollowUp = () => {
+    if (subscription.isGuest) {
+      subscription.showPaywall('guest-follow-up');
+      return;
+    }
+
+    setFollowUpInputVisible(true);
+    setInputHeight(54);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+  };
+
+  const guardarReflexionPersonal = async () => {
+    if (!activeDream?.id || (!reflectionDraft.trim() && !resonance)) return;
+
+    setReflectionStatus('saving');
+
+    try {
+      const updatedDream = await updateDreamRecordById(
+        activeDream.id,
+        dream => ({
+          schemaVersion: 4,
+          personalReflection: reflectionDraft.trim(),
+          resonance,
+          reflectionUpdatedAt: Date.now(),
+          updatedAt: Date.now(),
+          initialInterpretation:
+            dream.initialInterpretation || activeDream.initialInterpretation,
+        })
+      );
+
+      if (!updatedDream) {
+        setReflectionStatus('error');
+        return;
+      }
+
+      setActiveDream(currentDream => ({
+        ...currentDream,
+        personalReflection: updatedDream.personalReflection,
+        resonance: updatedDream.resonance,
+      }));
+      setReflectionStatus('saved');
+    } catch (error) {
+      console.error('Error guardando la reflexión personal:', error);
+      setReflectionStatus('error');
     }
   };
 
@@ -448,6 +827,180 @@ export default function MainScreen() {
   };
 
   const cicloCerrado = interactionStep === INTERACTION_STEPS.CLOSED;
+  const esPasoInicial = interactionStep === INTERACTION_STEPS.INITIAL;
+  const esPasoAmpliacion = interactionStep === INTERACTION_STEPS.FOLLOW_UP;
+  const descripcionLista = descripcion.trim().length > 0;
+  const mostrarIntroInicial = messages.length === 0 && esPasoInicial;
+  const mostrarComposerInicial = esPasoInicial && !cargando;
+  const mostrarBotonAmpliacion =
+    esPasoAmpliacion && !followUpInputVisible && !cargando;
+  const mostrarComposerAmpliacion =
+    esPasoAmpliacion && followUpInputVisible && !cargando;
+  const interpretationUsage = subscription.accessStatus?.interpretations;
+  const interpretationLimit = interpretationUsage?.limit ||
+    (subscription.isGuest ? 1 : 3);
+  const interpretationRemaining = interpretationUsage?.remaining ??
+    interpretationLimit;
+  const initialBlockedReason = interpretationUsage?.blockedReason || '';
+  const initialPaywallReason = initialBlockedReason === 'guest-demo-used'
+    ? 'guest-demo-used'
+    : initialBlockedReason === 'free-interpretation-limit'
+      ? 'free-interpretation-limit'
+      : '';
+  const interpretationRetryLabel = formatRetryAt(
+    interpretationUsage?.retryAtMillis
+  );
+  const interpretationAvailabilityLabel = interpretationRetryLabel &&
+    !initialPaywallReason
+    ? `${interpretationRemaining} lecturas restantes · disponible ${interpretationRetryLabel}`
+    : subscription.isPremium
+      ? `${interpretationRemaining} de ${interpretationLimit} lecturas Premium disponibles este mes`
+      : `${interpretationRemaining} de ${interpretationLimit} lecturas de IA disponibles`;
+
+  const getUserMessageLabel = (messageIndex) => {
+    if (!activeDream) return 'Tu sueño';
+
+    const previousUserMessages = messages
+      .slice(0, messageIndex)
+      .filter(message => message.role === 'user').length;
+
+    return previousUserMessages === 0 ? 'Tu sueño' : 'Tu ampliación';
+  };
+
+  const renderDreamComposer = (variant) => {
+    const isInitialComposer = variant === INTERACTION_STEPS.INITIAL;
+    const minHeight = isInitialComposer ? 170 : 54;
+    const maxHeight = isInitialComposer ? 260 : 128;
+    const composerHeight = Math.min(
+      Math.max(inputHeight, minHeight),
+      maxHeight
+    );
+    const aiActionLabel = isInitialComposer && initialPaywallReason
+      ? subscription.isGuest ? 'Crear cuenta para interpretar' : 'Ver Premium'
+      : isInitialComposer ? 'Explorar este sueño' : 'Profundizar';
+    const aiActionDisabled = initialPaywallReason
+      ? false
+      : !descripcionLista || cargando;
+    const handleAiAction = initialPaywallReason
+      ? () => subscription.showPaywall(initialPaywallReason)
+      : manejarEnvio;
+
+    return (
+      <View
+        style={[
+          styles.composerContainer,
+          isInitialComposer
+            ? styles.initialComposerContainer
+            : styles.followUpComposerContainer,
+        ]}
+      >
+        <Text style={styles.composerLabel}>
+          {isInitialComposer ? 'Tu sueño' : 'Tu ampliación'}
+        </Text>
+        {isInitialComposer ? (
+          <View style={styles.usageBanner}>
+            <Text style={styles.usageBannerTitle}>
+              {interpretationAvailabilityLabel}
+            </Text>
+            <Text style={styles.usageBannerText}>
+              Guardar este sueño sin interpretarlo no consume una lectura.
+            </Text>
+          </View>
+        ) : null}
+        <TextInput
+          style={[
+            styles.composerInput,
+            isInitialComposer ? styles.initialInput : styles.followUpInput,
+            { height: composerHeight },
+          ]}
+          placeholder={
+            isInitialComposer
+              ? 'Anota lo que recuerdas: lugares, personas, emociones, símbolos o cualquier detalle extraño.'
+              : 'Pregunta por un símbolo, una emoción o una escena concreta.'
+          }
+          placeholderTextColor="#8A8A8A"
+          value={descripcion}
+          onChangeText={setDescripcion}
+          multiline
+          editable={!cargando}
+          onContentSizeChange={handleContentSizeChange}
+          scrollEnabled={composerHeight >= maxHeight}
+          selectionColor="black"
+          textAlignVertical="top"
+        />
+        {isInitialComposer ? (
+          <View style={styles.optionalContextSection}>
+            <Text style={styles.optionalContextTitle}>
+              ¿Cómo te sentiste al despertar?
+            </Text>
+            <Text style={styles.optionalContextHint}>
+              Opcional. Tu propia emoción tiene más peso que cualquier símbolo.
+            </Text>
+            <View style={styles.emotionChips}>
+              {WAKING_EMOTIONS.map(emotion => {
+                const isSelected = wakingEmotion === emotion;
+
+                return (
+                  <TouchableOpacity
+                    key={emotion}
+                    style={[
+                      styles.emotionChip,
+                      isSelected && styles.emotionChipSelected,
+                    ]}
+                    onPress={() =>
+                      setWakingEmotion(isSelected ? '' : emotion)
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.emotionChipText,
+                        isSelected && styles.emotionChipTextSelected,
+                      ]}
+                    >
+                      {emotion}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TextInput
+              style={styles.wakingContextInput}
+              value={wakingContext}
+              onChangeText={setWakingContext}
+              placeholder="¿Hay algo de tu vida actual que relaciones con este sueño? (opcional)"
+              placeholderTextColor="#8A8A8A"
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+        ) : null}
+        <TouchableOpacity
+          style={[
+            styles.primaryActionButton,
+            aiActionDisabled && styles.primaryActionDisabled,
+          ]}
+          onPress={handleAiAction}
+          disabled={aiActionDisabled}
+        >
+          <Text style={styles.primaryActionText}>{aiActionLabel}</Text>
+          <AppIcon name="send" size={19} color="#fff" />
+        </TouchableOpacity>
+        {isInitialComposer ? (
+          <TouchableOpacity
+            style={[
+              styles.manualSaveButton,
+              (!descripcionLista || cargando) && styles.manualSaveButtonDisabled,
+            ]}
+            onPress={guardarSinInterpretacion}
+            disabled={!descripcionLista || cargando}
+          >
+            <AppIcon name="bookmark" size={17} color="#4338CA" />
+            <Text style={styles.manualSaveButtonText}>Guardar sin usar IA</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding" enabled>
@@ -458,15 +1011,24 @@ export default function MainScreen() {
           contentContainerStyle={[
             styles.messagesContent,
             { flexGrow: 1 },
-            messages.length === 0
-              ? { justifyContent: 'center', alignItems: 'center' }
-              : {},
+            mostrarIntroInicial ? styles.initialMessagesContent : {},
           ]}
           keyboardShouldPersistTaps="always"
         >
-          {messages.length === 0 && (
-            <Text style={styles.title}>Interpreta tu sueño</Text>
+          {mostrarIntroInicial && (
+            <View style={styles.initialIntro}>
+              <Text style={styles.title}>
+                Explora lo que tu sueño puede estar reflejando
+              </Text>
+              <Text style={styles.subtitle}>
+                No hay una única respuesta. Cuantos más detalles y asociaciones
+                personales compartas, más útil será la reflexión.
+              </Text>
+            </View>
           )}
+
+          {mostrarComposerInicial && messages.length === 0 &&
+            renderDreamComposer(INTERACTION_STEPS.INITIAL)}
 
           {messages.map((message, index) => (
             <View
@@ -484,7 +1046,12 @@ export default function MainScreen() {
                   markdownStyle={markdownStyle}
                 />
               ) : (
-                <Text style={styles.messageText}>{message.text}</Text>
+                <>
+                  <Text style={styles.userMessageLabel}>
+                    {getUserMessageLabel(index)}
+                  </Text>
+                  <Text style={styles.messageText}>{message.text}</Text>
+                </>
               )}
             </View>
           ))}
@@ -495,10 +1062,122 @@ export default function MainScreen() {
             </View>
           )}
 
+          {mostrarComposerInicial && messages.length > 0 &&
+            renderDreamComposer(INTERACTION_STEPS.INITIAL)}
+
+          {activeDream && !cargando && !esPasoInicial && !savedWithoutAi ? (
+            <View style={styles.reflectionCard}>
+              <Text style={styles.reflectionEyebrow}>TU VOZ IMPORTA</Text>
+              <Text style={styles.reflectionTitle}>
+                ¿Qué parte te hizo pensar?
+              </Text>
+              <Text style={styles.reflectionHint}>
+                La lectura es solo una hipótesis. Guarda lo que te resulte útil y
+                descarta lo que no te represente.
+              </Text>
+
+              <View style={styles.resonanceRow}>
+                {RESONANCE_OPTIONS.map(option => {
+                  const isSelected = resonance === option.value;
+
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.resonanceButton,
+                        isSelected && styles.resonanceButtonSelected,
+                      ]}
+                      onPress={() => {
+                        setResonance(isSelected ? '' : option.value);
+                        setReflectionStatus('');
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.resonanceButtonText,
+                          isSelected && styles.resonanceButtonTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <TextInput
+                value={reflectionDraft}
+                onChangeText={text => {
+                  setReflectionDraft(text);
+                  setReflectionStatus('');
+                }}
+                style={styles.reflectionInput}
+                placeholder="Escribe una conclusión, una pregunta o algo que quieras recordar."
+                placeholderTextColor="#8A8A8A"
+                multiline
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.saveReflectionButton,
+                  (!reflectionDraft.trim() && !resonance) &&
+                    styles.saveReflectionButtonDisabled,
+                ]}
+                disabled={
+                  reflectionStatus === 'saving' ||
+                  (!reflectionDraft.trim() && !resonance)
+                }
+                onPress={guardarReflexionPersonal}
+              >
+                <Text style={styles.saveReflectionButtonText}>
+                  {reflectionStatus === 'saving'
+                    ? 'Guardando...'
+                    : 'Guardar mi reflexión'}
+                </Text>
+              </TouchableOpacity>
+
+              {reflectionStatus === 'saved' ? (
+                <Text style={styles.reflectionSuccess}>
+                  Tu reflexión quedó guardada en el diario.
+                </Text>
+              ) : null}
+              {reflectionStatus === 'error' ? (
+                <Text style={styles.reflectionError}>
+                  No se pudo guardar. Inténtalo de nuevo.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {subscription.isGuest && activeDream && !esPasoInicial ? (
+            <TouchableOpacity
+              style={styles.accountUpgradeCard}
+              onPress={() => subscription.showPaywall(
+                activeDream.initialInterpretation
+                  ? 'guest-follow-up'
+                  : 'account-required'
+              )}
+            >
+              <Text style={styles.accountUpgradeTitle}>
+                {activeDream.initialInterpretation
+                  ? 'Profundiza en esta lectura'
+                  : 'Mantén tu recorrido en esta sesión'}
+              </Text>
+              <Text style={styles.accountUpgradeText}>
+                Crea una cuenta gratuita para desbloquear tus lecturas restantes
+                y continuar desde aquí.
+              </Text>
+              <Text style={styles.accountUpgradeAction}>Crear cuenta →</Text>
+            </TouchableOpacity>
+          ) : null}
+
           {cicloCerrado && (
             <View style={styles.closedNotice}>
               <Text style={styles.closedNoticeText}>
-                Interpretación guardada con la ampliación.
+                {savedWithoutAi
+                  ? 'Registro guardado sin usar una lectura de IA.'
+                  : 'Registro guardado con la lectura y tu ampliación.'}
               </Text>
               <TouchableOpacity
                 style={styles.newDreamButton}
@@ -506,45 +1185,32 @@ export default function MainScreen() {
               >
                 <AppIcon name="refresh" size={18} color="#fff" />
                 <Text style={styles.newDreamButtonText}>
-                  Nueva interpretación
+                  Registrar otro sueño
                 </Text>
               </TouchableOpacity>
             </View>
           )}
-        </ScrollView>
 
-        {!cicloCerrado && (
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.fixedInputContainer}>
-            <TextInput
-              style={[styles.input, { flex: 1, height: inputHeight }]}
-              placeholder={
-                cicloCerrado
-                  ? 'Interpretación guardada'
-                  : interactionStep === INTERACTION_STEPS.INITIAL
-                  ? 'Describe tu sueño...'
-                  : '¿Quieres profundizar más?'
-              }
-              value={descripcion}
-              onChangeText={setDescripcion}
-              multiline
-              editable={!cargando}
-              onContentSizeChange={handleContentSizeChange}
-              selectionColor="black"
-            />
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                cargando && styles.sendButtonDisabled,
-              ]}
-              onPress={manejarEnvio}
-              disabled={cargando}
-            >
-              <AppIcon name="send" size={24} color="#fff" />
-            </TouchableOpacity>
+          {mostrarBotonAmpliacion && (
+            <View style={styles.followUpPrompt}>
+              <Text style={styles.followUpPromptTitle}>
+                ¿Quieres profundizar en una escena, símbolo o emoción?
+              </Text>
+              <TouchableOpacity
+                style={styles.followUpButton}
+                onPress={handleOpenFollowUp}
+              >
+                <Text style={styles.followUpButtonText}>
+                  Profundizar
+                </Text>
+                <AppIcon name="arrowRight" size={18} color="#fff" />
+              </TouchableOpacity>
             </View>
-          </TouchableWithoutFeedback>
-        )}
+          )}
+
+          {mostrarComposerAmpliacion &&
+            renderDreamComposer(INTERACTION_STEPS.FOLLOW_UP)}
+        </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
@@ -565,59 +1231,198 @@ const styles = StyleSheet.create({
   messagesContent: {
     paddingVertical: 20,
   },
+  initialMessagesContent: {
+    justifyContent: 'center',
+  },
+  initialIntro: {
+    alignSelf: 'center',
+    marginBottom: 22,
+    maxWidth: 520,
+    width: '100%',
+  },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    color: '#111',
+    fontSize: 29,
+    fontWeight: '800',
+    lineHeight: 35,
+    marginBottom: 8,
+    textAlign: 'left',
   },
-  fixedInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
+  subtitle: {
+    color: '#5F6368',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  composerContainer: {
+    alignSelf: 'center',
+    backgroundColor: '#F7F7F7',
+    borderColor: '#E5E5E5',
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 520,
+    padding: 14,
+    width: '100%',
+  },
+  initialComposerContainer: {
+    marginBottom: 8,
+  },
+  followUpComposerContainer: {
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  composerLabel: {
+    color: '#222',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  usageBanner: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 8,
+    marginBottom: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  usageBannerTitle: {
+    color: '#3730A3',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  usageBannerText: {
+    color: '#6366F1',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  composerInput: {
     backgroundColor: '#fff',
-    elevation: 0,
-    borderRadius: 0,
-  },
-  input: {
-    borderColor: '#fff',
-    borderWidth: 0,
-    padding: 10,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    elevation: 0,
+    borderColor: '#DADADA',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#333',
     fontSize: 16,
     fontFamily: 'System',
+    lineHeight: 22,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  initialInput: {
+    minHeight: 170,
+  },
+  followUpInput: {
+    minHeight: 54,
+  },
+  optionalContextSection: {
+    borderTopColor: '#E2E8F0',
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 14,
+  },
+  optionalContextTitle: {
+    color: '#222',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  optionalContextHint: {
+    color: '#64748B',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  emotionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 11,
+  },
+  emotionChip: {
+    backgroundColor: '#fff',
+    borderColor: '#CBD5E1',
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  emotionChipSelected: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#4F46E5',
+  },
+  emotionChipText: {
+    color: '#475569',
+    fontSize: 12,
+    textTransform: 'capitalize',
+  },
+  emotionChipTextSelected: {
+    color: '#3730A3',
+    fontWeight: '800',
+  },
+  wakingContextInput: {
+    backgroundColor: '#fff',
+    borderColor: '#DADADA',
+    borderRadius: 8,
+    borderWidth: 1,
     color: '#333',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 11,
+    minHeight: 84,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
   },
-  sendButton: {
-    width: 47,
-    height: 47,
-    borderRadius: 25,
-    backgroundColor: '#000',
-    justifyContent: 'center',
+  primaryActionButton: {
     alignItems: 'center',
-    marginLeft: 10,
-    elevation: 3,
+    alignSelf: 'stretch',
+    backgroundColor: '#000',
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 48,
+    paddingHorizontal: 14,
   },
-  sendButtonDisabled: {
-    backgroundColor: '#999',
-    elevation: 0,
+  primaryActionDisabled: {
+    backgroundColor: '#9B9B9B',
+  },
+  primaryActionText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  manualSaveButton: {
+    alignItems: 'center',
+    borderColor: '#C7D2FE',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 44,
+    paddingHorizontal: 14,
+  },
+  manualSaveButtonDisabled: {
+    opacity: 0.45,
+  },
+  manualSaveButtonText: {
+    color: '#4338CA',
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: 7,
   },
   message: {
-    marginBottom: 10,
+    marginBottom: 12,
     padding: 10,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   userMessage: {
-    backgroundColor: '#f0f0f0',
-    alignSelf: 'flex-end',
-    maxWidth: '80%',
-    elevation: 1.5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    alignSelf: 'center',
+    backgroundColor: '#F5F5F5',
+    borderLeftColor: '#111',
+    borderLeftWidth: 3,
+    maxWidth: '100%',
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    width: '100%',
   },
   chatgptMessage: {
     backgroundColor: '#fff',
@@ -631,6 +1436,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'System',
     color: '#333',
+    lineHeight: 22,
+  },
+  userMessageLabel: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 5,
+    textTransform: 'uppercase',
   },
   loadingMessage: {
     alignItems: 'flex-start',
@@ -639,6 +1452,128 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 0,
     paddingVertical: 4,
+  },
+  reflectionCard: {
+    alignSelf: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 18,
+    marginTop: 8,
+    maxWidth: 520,
+    padding: 16,
+    width: '100%',
+  },
+  reflectionEyebrow: {
+    color: '#6366F1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  reflectionTitle: {
+    color: '#111827',
+    fontSize: 19,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  reflectionHint: {
+    color: '#64748B',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  resonanceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginTop: 13,
+  },
+  resonanceButton: {
+    backgroundColor: '#fff',
+    borderColor: '#CBD5E1',
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  resonanceButtonSelected: {
+    backgroundColor: '#4338CA',
+    borderColor: '#4338CA',
+  },
+  resonanceButtonText: {
+    color: '#475569',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  resonanceButtonTextSelected: {
+    color: '#fff',
+  },
+  reflectionInput: {
+    backgroundColor: '#fff',
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    borderWidth: 1,
+    color: '#111827',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 12,
+    minHeight: 92,
+    padding: 11,
+  },
+  saveReflectionButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#4338CA',
+    borderRadius: 8,
+    justifyContent: 'center',
+    marginTop: 11,
+    minHeight: 42,
+    paddingHorizontal: 14,
+  },
+  saveReflectionButtonDisabled: {
+    opacity: 0.45,
+  },
+  saveReflectionButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reflectionSuccess: {
+    color: '#047857',
+    fontSize: 12,
+    marginTop: 9,
+  },
+  reflectionError: {
+    color: '#B91C1C',
+    fontSize: 12,
+    marginTop: 9,
+  },
+  accountUpgradeCard: {
+    alignSelf: 'center',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    marginBottom: 16,
+    maxWidth: 520,
+    padding: 16,
+    width: '100%',
+  },
+  accountUpgradeTitle: {
+    color: '#312E81',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  accountUpgradeText: {
+    color: '#4F46E5',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  accountUpgradeAction: {
+    color: '#312E81',
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 9,
   },
   typingIndicator: {
     alignItems: 'center',
@@ -672,7 +1607,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#000',
-    borderRadius: 24,
+    borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
@@ -681,5 +1616,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  followUpPrompt: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: 2,
+    marginBottom: 16,
+    maxWidth: 520,
+    width: '100%',
+  },
+  followUpPromptTitle: {
+    color: '#555',
+    fontSize: 14,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  followUpButton: {
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 16,
+  },
+  followUpButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    marginRight: 8,
   },
 });

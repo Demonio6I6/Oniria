@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Oniria",
-    "slug": "oniria",
+    "name": "Lunentra",
+    "slug": "lunentra",
     "version": "1.0.0",
-    "scheme": "oniria",
+    "scheme": "lunentra",
     "orientation": "portrait",
-    "icon": "./assets/icon1.png",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -15,16 +15,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nicarao.oniria",
+      "bundleIdentifier": "com.nicarao.lunentra",
       "googleServicesFile": "./assets/GoogleService-Info.plist",
       "jsEngine": "jsc"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon1.png",
+        "foregroundImage": "./assets/adaptive-foreground.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.nicarao.oniria",
+      "package": "com.nicarao.lunentra",
       "jsEngine": "hermes",
       "googleServicesFile": "./assets/google-services.json"
     },

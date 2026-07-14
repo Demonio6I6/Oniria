@@ -1,12 +1,14 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { app } from './src/firebase/config';
+import { getInstallationId } from './src/services/installationId';
 
 const REGION = 'europe-west1';
 const functions = getFunctions(app, REGION);
 
 async function callTextFunction(name, payload) {
   const callable = httpsCallable(functions, name, { timeout: 120000 });
-  const result = await callable(payload);
+  const installationId = await getInstallationId();
+  const result = await callable({ ...payload, installationId });
   const text = result.data?.text;
 
   if (typeof text !== 'string') {
@@ -42,13 +44,33 @@ export const obtenerRespuestaChat = async (
   });
 };
 
-export const obtenerResumenInterpretacion = async (interpretacionCompleta) => {
-  return callTextFunction('summarizeInterpretation', { interpretacionCompleta });
+export const obtenerResumenInterpretacion = async (
+  interpretacionCompleta,
+  dreamSessionId = ''
+) => {
+  return callTextFunction('summarizeInterpretation', {
+    interpretacionCompleta,
+    dreamSessionId,
+  });
 };
 
-export const obtenerEmocionesDesdeContexto = async (descripcion, contextoPerfil) => {
-  const callable = httpsCallable(functions, 'extractDreamEmotions', { timeout: 120000 });
-  const result = await callable({ descripcion, contextoPerfil });
+export const obtenerEmocionesDesdeContexto = async (
+  descripcion,
+  contextoPerfil,
+  dreamSessionId = ''
+) => {
+  const callable = httpsCallable(
+    functions,
+    'extractDreamEmotions',
+    { timeout: 120000 }
+  );
+  const installationId = await getInstallationId();
+  const result = await callable({
+    descripcion,
+    contextoPerfil,
+    dreamSessionId,
+    installationId,
+  });
   const emociones = result.data?.emociones;
 
   return Array.isArray(emociones) ? emociones : [];

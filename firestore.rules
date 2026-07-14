@@ -14,8 +14,32 @@ service cloud.firestore {
       allow read, write: if ownsUserDocument(userId);
 
       match /{document=**} {
-        allow read, write: if ownsUserDocument(userId);
+        allow read, write: if false;
       }
+    }
+
+    match /privateAiUsage/{userId} {
+      allow read, write: if false;
+    }
+
+    match /privateEntitlements/{userId} {
+      allow read, write: if false;
+    }
+
+    match /privateProductEvents/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /privateProductEventRate/{userId} {
+      allow read, write: if false;
+    }
+
+    match /privateInstallationTrials/{installationHash} {
+      allow read, write: if false;
+    }
+
+    match /privateAnonymousMigrations/{anonymousUid} {
+      allow read, write: if false;
     }
 
     match /{document=**} {

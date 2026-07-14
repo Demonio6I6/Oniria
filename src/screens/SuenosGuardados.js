@@ -24,6 +24,12 @@ import {
   loadSavedDreams,
 } from '../services/dreamRepository';
 
+const RESONANCE_LABELS = {
+  yes: 'Me resonó',
+  partial: 'Me resonó en parte',
+  no: 'No me representó',
+};
+
 export default function SuenosGuardados({ navigation }) {
   const [suenos, setSuenos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +207,19 @@ export default function SuenosGuardados({ navigation }) {
       ) : (
         <ScrollView contentContainerStyle={styles.container}>
           {suenos.length === 0 ? (
-            <Text>No hay sueños guardados.</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Tu diario todavía está vacío.</Text>
+              <Text style={styles.emptyText}>
+                Empieza con una imagen, una emoción o cualquier detalle que aún
+                recuerdes.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyButton}
+                onPress={() => navigation.navigate('NuevoSueno')}
+              >
+                <Text style={styles.emptyButtonText}>Registrar un sueño</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             suenos.map(sueno => {
               const dreamId = getDreamId(sueno);
@@ -221,6 +239,16 @@ export default function SuenosGuardados({ navigation }) {
                   <Text style={styles.suenoSummary}>
                     {getDreamSummary(sueno)}
                   </Text>
+                  {!!sueno.wakingEmotion && (
+                    <Text style={styles.dreamMeta}>
+                      Al despertar: {sueno.wakingEmotion}
+                    </Text>
+                  )}
+                  {!!sueno.personalReflection && (
+                    <Text style={styles.reflectionPreview} numberOfLines={2}>
+                      Tu reflexión: {sueno.personalReflection}
+                    </Text>
+                  )}
                   <Text style={styles.timestamp}>
                     {new Date(getDreamTimestamp(sueno)).toLocaleString()}
                   </Text>
@@ -271,10 +299,75 @@ export default function SuenosGuardados({ navigation }) {
             <ScrollView contentContainerStyle={styles.modalContent}>
               {selectedDream && (
                 <>
-                  <Text style={styles.modalTitle}>
-                    Interpretación del sueño
+                  <Text style={styles.modalEyebrow}>TU SUEÑO</Text>
+                  <Text style={styles.dreamDescription}>
+                    {selectedDream.description || getDreamSummary(selectedDream)}
                   </Text>
-                  <Markdown>{getDreamInterpretation(selectedDream)}</Markdown>
+
+                  {!!selectedDream.wakingEmotion && (
+                    <Text style={styles.detailMeta}>
+                      Emoción al despertar: {selectedDream.wakingEmotion}
+                    </Text>
+                  )}
+                  {!!selectedDream.wakingContext && (
+                    <View style={styles.personalSection}>
+                      <Text style={styles.personalSectionTitle}>
+                        Asociación con tu vida
+                      </Text>
+                      <Text style={styles.personalSectionText}>
+                        {selectedDream.wakingContext}
+                      </Text>
+                    </View>
+                  )}
+
+                  {getDreamInterpretation(selectedDream) ? (
+                    <>
+                      <Text style={[styles.modalTitle, styles.readingTitle]}>
+                        Lectura orientativa
+                      </Text>
+                      <Markdown>{getDreamInterpretation(selectedDream)}</Markdown>
+                    </>
+                  ) : (
+                    <View style={styles.manualDreamNotice}>
+                      <Text style={styles.manualDreamNoticeTitle}>
+                        Guardado sin lectura de IA
+                      </Text>
+                      <Text style={styles.manualDreamNoticeText}>
+                        Este registro forma parte de tu diario y de tus recuentos,
+                        pero no consumió una interpretación.
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.manualDreamAction}
+                        onPress={() => {
+                          setModalVisible(false);
+                          navigation.navigate('NuevoSueno', {
+                            manualDream: selectedDream,
+                          });
+                        }}
+                      >
+                        <Text style={styles.manualDreamActionText}>
+                          Interpretar este sueño
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {(selectedDream.personalReflection || selectedDream.resonance) ? (
+                    <View style={styles.reflectionSection}>
+                      <Text style={styles.personalSectionTitle}>Tu reflexión</Text>
+                      {!!selectedDream.resonance && (
+                        <Text style={styles.resonanceLabel}>
+                          {RESONANCE_LABELS[selectedDream.resonance] ||
+                            selectedDream.resonance}
+                        </Text>
+                      )}
+                      {!!selectedDream.personalReflection && (
+                        <Text style={styles.personalSectionText}>
+                          {selectedDream.personalReflection}
+                        </Text>
+                      )}
+                    </View>
+                  ) : null}
                 </>
               )}
             </ScrollView>
@@ -306,6 +399,38 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  emptyState: {
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+    borderRadius: 14,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    padding: 20,
+  },
+  emptyTitle: {
+    color: '#111827',
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  emptyText: {
+    color: '#64748B',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 7,
+  },
+  emptyButton: {
+    backgroundColor: '#111827',
+    borderRadius: 8,
+    marginTop: 16,
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   suenoContainer: {
     marginBottom: 16,
     padding: 16,
@@ -321,6 +446,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+  },
+  dreamMeta: {
+    color: '#4338CA',
+    fontSize: 12,
+    marginTop: 7,
+    textTransform: 'capitalize',
+  },
+  reflectionPreview: {
+    color: '#475569',
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    marginTop: 7,
   },
   timestamp: {
     fontSize: 12,
@@ -346,7 +484,88 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  readingTitle: {
+    marginTop: 22,
+  },
+  manualDreamNotice: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    marginTop: 20,
+    padding: 14,
+  },
+  manualDreamNoticeTitle: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  manualDreamNoticeText: {
+    color: '#4B5563',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  manualDreamAction: {
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderRadius: 8,
+    marginTop: 12,
+    minHeight: 42,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  manualDreamActionText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modalEyebrow: {
+    color: '#6366F1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  dreamDescription: {
+    color: '#111827',
+    fontSize: 16,
+    lineHeight: 23,
+  },
+  detailMeta: {
+    color: '#4338CA',
+    fontSize: 13,
+    marginTop: 10,
+    textTransform: 'capitalize',
+  },
+  personalSection: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    marginTop: 14,
+    padding: 13,
+  },
+  personalSectionTitle: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 5,
+  },
+  personalSectionText: {
+    color: '#475569',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  reflectionSection: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 10,
+    marginTop: 20,
+    padding: 14,
+  },
+  resonanceLabel: {
+    color: '#4338CA',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 7,
   },
   modalOption: {
     paddingVertical: 10,

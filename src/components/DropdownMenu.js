@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { navigationRef } from '../utils/navigationRef';
 import AppIcon from './AppIcon';
+import { trackProductEvent } from '../services/productAnalytics';
 
 export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -48,6 +49,9 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
   }, [fadeAnim, isVisible, translateY]);
 
   const handleNavigate = (screen) => {
+    if (screen === 'Cuenta' && user?.isAnonymous) {
+      trackProductEvent('account_cta_clicked', { reason: 'menu' });
+    }
     navigationRef.navigate(screen);
     onClose();
   };
@@ -86,9 +90,13 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
 
     Alert.alert(
       'Salir como invitado',
-      'Esta cuenta invitada no se puede recuperar después. Al salir se borrarán sus datos locales y remotos.',
+      'Esta cuenta invitada no se puede recuperar después. Puedes crear una cuenta para continuar o borrar la sesión.',
       [
         { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Crear cuenta',
+          onPress: () => handleNavigate('Cuenta'),
+        },
         {
           text: 'Borrar y salir',
           style: 'destructive',
@@ -115,18 +123,36 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
         >
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => handleNavigate('Home')}
+          >
+            <AppIcon name="moon" size={20} />
+            <Text style={styles.menuText}>Inicio</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={() => handleNavigate('Perfil')}
           >
             <AppIcon name="profile" size={20} />
-            <Text style={styles.menuText}>Perfil</Text>
+            <Text style={styles.menuText}>Mi contexto</Text>
           </TouchableOpacity>
+
+          {user?.isAnonymous ? (
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => handleNavigate('Cuenta')}
+            >
+              <AppIcon name="check" size={20} />
+              <Text style={styles.menuText}>Crear cuenta</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => handleNavigate('SuenosGuardados')}
           >
             <AppIcon name="bookmark" size={20} />
-            <Text style={styles.menuText}>Sueños guardados</Text>
+            <Text style={styles.menuText}>Mi diario</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -134,15 +160,23 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             onPress={() => handleNavigate('DiagramaEmocional')}
           >
             <AppIcon name="chart" size={20} />
-            <Text style={styles.menuText}>Diagrama Emocional</Text>
+            <Text style={styles.menuText}>Mis patrones</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => handleNavigate('Configuracion')}
           >
-            <AppIcon name="settings" size={20} />
-            <Text style={styles.menuText}>Configuración</Text>
+            <AppIcon name="shield" size={20} />
+            <Text style={styles.menuText}>Privacidad y control</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleNavigate('PlanPremium')}
+          >
+            <AppIcon name="bookmark" size={20} />
+            <Text style={styles.menuText}>Plan y Premium</Text>
           </TouchableOpacity>
 
           <View style={styles.divider} />

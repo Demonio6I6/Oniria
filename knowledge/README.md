@@ -1,4 +1,4 @@
-# Biblioteca de conocimiento de Oniria
+# Biblioteca de conocimiento de Lunentra
 
 Esta carpeta es para textos fuente que puedan usarse mas adelante en una capa
 RAG o vector store. La app movil no deberia cargar PDFs completos ni libros

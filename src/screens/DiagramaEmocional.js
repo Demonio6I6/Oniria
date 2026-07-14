@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -23,8 +24,19 @@ import {
 } from '../domain/dreams';
 import { loadSavedDreams } from '../services/dreamRepository';
 import { loadEmotionRecords } from '../services/emotionRepository';
+import {
+  loadMonthlyAnalysis,
+  saveMonthlyAnalysis,
+} from '../services/monthlyAnalysisRepository';
+import {
+  acceptMonthlyAnalysisPrivacyNotice,
+  hasAcceptedMonthlyAnalysisPrivacyNotice,
+} from '../services/privacyRepository';
+import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
 
 const MAX_DREAMS_PER_ANALYSIS = 45;
+const MIN_DREAMS_PER_MONTHLY_ANALYSIS = 10;
+const MONTHLY_ANALYSIS_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 const RADAR_MAX_VALUE = 100;
 const RADAR_MAX_SIZE = 320;
 const RADAR_MIN_SIZE = 240;
@@ -44,21 +56,132 @@ const getCurrentMonthPeriod = () => {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const label = now.toLocaleDateString('es-ES', {
     month: 'long',
     year: 'numeric',
   });
 
-  return { start, end, label };
+  return { start, end, key, label };
+};
+
+const getFunctionErrorCode = (error) =>
+  String(error?.code || '').replace(/^functions\//, '');
+
+const getFunctionErrorDetails = (error) =>
+  error?.details || error?.customData?.details || {};
+
+const formatRetryAt = (retryAt) => {
+  if (!retryAt) return '';
+
+  const date = new Date(retryAt);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleString([], {
+    weekday: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const formatAnalysisDate = (timestamp) => {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return date.toLocaleDateString([], {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const buildMonthlyAnalysisErrorMessage = (error, dreamCount) => {
+  const code = getFunctionErrorCode(error);
+  const details = getFunctionErrorDetails(error);
+
+  if (code === 'failed-precondition' && details.reason === 'account-required') {
+    return 'Crea una cuenta para conservar tus suenos y activar esta lectura.';
+  }
+
+  if (
+    code === 'failed-precondition' &&
+    details.reason === 'monthly-analysis-min-dreams'
+  ) {
+    const requiredDreams =
+      details.requiredDreams || MIN_DREAMS_PER_MONTHLY_ANALYSIS;
+    const currentDreams = details.currentDreams || dreamCount;
+    const missingDreams = Math.max(requiredDreams - currentDreams, 0);
+
+    return `Necesitas ${requiredDreams} suenos este mes. Te faltan ${missingDreams}.`;
+  }
+
+  if (code === 'resource-exhausted') {
+    if (details.reason === 'premium-required') {
+      return 'El analisis mensual requiere Lunentra Premium.';
+    }
+
+    if (details.reason === 'monthly-analysis-in-progress') {
+      return 'Ya hay un analisis mensual en curso. Espera un momento antes de intentarlo otra vez.';
+    }
+
+    const retryAt = details.retryAt || details.retryAtMillis;
+    const formattedRetryAt = formatRetryAt(retryAt);
+
+    return formattedRetryAt
+      ? `Ya generaste tu analisis mensual. Podras pedir otro a partir de ${formattedRetryAt}.`
+      : 'Ya generaste tu analisis mensual. Podras pedir otro mas adelante.';
+  }
+
+  return 'No se pudo generar el analisis mensual en este momento.';
+};
+
+const confirmarPrivacidadIA = async () => {
+  if (await hasAcceptedMonthlyAnalysisPrivacyNotice()) return true;
+
+  return new Promise(resolve => {
+    Alert.alert(
+      'Privacidad del analisis',
+      'Para generar este analisis se enviaran tus suenos guardados del mes y sus interpretaciones a nuestro servidor y al proveedor de IA. No se usa como diagnostico clinico.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+          onPress: () => resolve(false),
+        },
+        {
+          text: 'Aceptar',
+          onPress: async () => {
+            try {
+              await acceptMonthlyAnalysisPrivacyNotice();
+              resolve(true);
+            } catch (error) {
+              console.error('Error guardando consentimiento de privacidad:', error);
+              Alert.alert(
+                'Error',
+                'No se pudo guardar tu preferencia de privacidad.'
+              );
+              resolve(false);
+            }
+          },
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: () => resolve(false),
+      }
+    );
+  });
 };
 
 export default function DiagramaEmocional() {
+  const subscription = useSubscriptionAccess();
   const { width } = useWindowDimensions();
   const [data, setData] = useState([]);
   const [selectedEmocion, setSelectedEmocion] = useState(null);
   const [cantidadSuenos, setCantidadSuenos] = useState(0);
   const [suenos, setSuenos] = useState([]);
   const [analisisMensual, setAnalisisMensual] = useState('');
+  const [monthlyAnalysisRecord, setMonthlyAnalysisRecord] = useState(null);
   const [analizandoMensual, setAnalizandoMensual] = useState(false);
   const chartSize = Math.max(
     RADAR_MIN_SIZE,
@@ -73,17 +196,30 @@ export default function DiagramaEmocional() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const [legacyRecords, suenosGuardados] = await Promise.all([
+        const [
+          legacyRecords,
+          suenosGuardados,
+          cachedMonthlyAnalysis,
+        ] = await Promise.all([
           loadEmotionRecords(),
           loadSavedDreams(),
+          loadMonthlyAnalysis(),
         ]);
         const dreamRecords = buildEmotionRecordsFromDreams(suenosGuardados);
         const registros = mergeEmotionRecords(legacyRecords, dreamRecords);
         const chart = buildEmotionChartData(registros);
+        const currentPeriodKey = getCurrentMonthPeriod().key;
+        const cachedAnalysisIsCurrent =
+          cachedMonthlyAnalysis?.periodKey === currentPeriodKey &&
+          typeof cachedMonthlyAnalysis?.text === 'string';
 
         setData(chart.chartData);
         setCantidadSuenos(chart.totalDreams);
         setSuenos(suenosGuardados);
+        setMonthlyAnalysisRecord(cachedMonthlyAnalysis || null);
+        setAnalisisMensual(
+          cachedAnalysisIsCurrent ? cachedMonthlyAnalysis.text : ''
+        );
       } catch (error) {
         console.error('Error al cargar datos emocionales:', error);
       }
@@ -91,6 +227,19 @@ export default function DiagramaEmocional() {
 
     cargarDatos();
   }, []);
+
+  useEffect(() => {
+    const accountConversionSubscription = DeviceEventEmitter.addListener(
+      'accountConversionCompleted',
+      event => {
+        if (event?.reason !== 'monthly-analysis-account') return;
+        subscription.refresh();
+        setTimeout(() => subscription.showPaywall('monthly-analysis'), 350);
+      }
+    );
+
+    return () => accountConversionSubscription.remove();
+  }, [subscription.refresh, subscription.showPaywall]);
 
   const renderRadarChart = () => {
     if (!data.length) return null;
@@ -172,6 +321,9 @@ export default function DiagramaEmocional() {
                   ]}
                 />
               </View>
+              <Text style={styles.emotionEvidence}>
+                Aparece en {item.count} de {cantidadSuenos} sueños analizados.
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -195,14 +347,22 @@ export default function DiagramaEmocional() {
       .join(' y ');
 
     return (
-      <Text style={styles.detailText}>
-        En tus últimos {cantidadSuenos} sueños con emociones reconocidas destaca{' '}
-        <Text style={styles.bold}>{principal.label}</Text> con{' '}
-        {formatPercent(principal.value)}.{' '}
-        {secundariasText
-          ? `También aparecen ${secundariasText}.`
-          : 'Por ahora no hay otra emoción con presencia clara.'}
-      </Text>
+      <View style={styles.detailBox}>
+        <Text style={styles.detailLabel}>
+          {cantidadSuenos < 5 ? 'PRIMER INDICIO' : 'LECTURA GENERAL'}
+        </Text>
+        <Text style={styles.detailText}>
+          En tus últimos {cantidadSuenos} sueños con emociones reconocidas destaca{' '}
+          <Text style={styles.bold}>{principal.label}</Text> con{' '}
+          {formatPercent(principal.value)}.{' '}
+          {secundariasText
+            ? `También aparecen ${secundariasText}.`
+            : 'Por ahora no hay otra emoción con presencia clara.'}
+          {cantidadSuenos < 5
+            ? ' Todavía hay pocos registros, así que conviene leerlo como una señal inicial.'
+            : ''}
+        </Text>
+      </View>
     );
   };
 
@@ -254,16 +414,42 @@ export default function DiagramaEmocional() {
   const generarAnalisisMensual = async () => {
     if (analizandoMensual) return;
 
-    const { label } = getCurrentMonthPeriod();
+    if (subscription.isGuest) {
+      subscription.showPaywall('monthly-analysis-account');
+      return;
+    }
+
+    if (!subscription.isPremium) {
+      subscription.showPaywall('monthly-analysis');
+      return;
+    }
+
+    const { key, label } = getCurrentMonthPeriod();
     const suenosDelMes = getCurrentMonthDreams();
 
-    if (!suenosDelMes.length) {
+    if (suenosDelMes.length < MIN_DREAMS_PER_MONTHLY_ANALYSIS) {
+      const suenosFaltantes =
+        MIN_DREAMS_PER_MONTHLY_ANALYSIS - suenosDelMes.length;
+
       Alert.alert(
-        'Sin sueños este mes',
-        'No hay sueños guardados en el mes actual.'
+        'Aún no hay suficientes sueños',
+        `Necesitas ${MIN_DREAMS_PER_MONTHLY_ANALYSIS} sueños este mes. ` +
+          `Te faltan ${suenosFaltantes}.`
       );
       return;
     }
+
+    const nextAvailableAt = monthlyAnalysisRecord?.nextAvailableAt || 0;
+    if (nextAvailableAt > Date.now()) {
+      Alert.alert(
+        'Análisis mensual ya generado',
+        `Podrás pedir otro a partir de ${formatRetryAt(nextAvailableAt)}.`
+      );
+      return;
+    }
+
+    const privacidadAceptada = await confirmarPrivacidadIA();
+    if (!privacidadAceptada) return;
 
     setAnalizandoMensual(true);
 
@@ -278,12 +464,35 @@ export default function DiagramaEmocional() {
         `Mes actual: ${label}`
       );
 
+      const createdAt = Date.now();
+      const analysisRecord = {
+        text: respuesta,
+        periodKey: key,
+        periodLabel: label,
+        dreamCount: suenosDelMes.length,
+        analyzedDreamCount: suenosParaAnalisis.length,
+        createdAt,
+        nextAvailableAt: createdAt + MONTHLY_ANALYSIS_COOLDOWN_MS,
+      };
+
+      setMonthlyAnalysisRecord(analysisRecord);
       setAnalisisMensual(respuesta);
+      saveMonthlyAnalysis(analysisRecord).catch(storageError => {
+        console.error('Error guardando análisis mensual:', storageError);
+      });
     } catch (error) {
       console.error('Error generando análisis mensual:', error);
+      const details = getFunctionErrorDetails(error);
+
+      if (details.reason === 'account-required') {
+        subscription.showPaywall('monthly-analysis-account');
+      } else if (details.reason === 'premium-required') {
+        subscription.showPaywall('monthly-analysis');
+      }
+
       Alert.alert(
-        'Error',
-        'No se pudo generar el análisis mensual en este momento.'
+        'Análisis no disponible',
+        buildMonthlyAnalysisErrorMessage(error, suenosDelMes.length)
       );
     } finally {
       setAnalizandoMensual(false);
@@ -291,11 +500,34 @@ export default function DiagramaEmocional() {
   };
 
   const suenosMesActual = getCurrentMonthDreams();
+  const currentPeriod = getCurrentMonthPeriod();
+  const suenosFaltantesAnalisis = Math.max(
+    MIN_DREAMS_PER_MONTHLY_ANALYSIS - suenosMesActual.length,
+    0
+  );
+  const hasMinimumMonthlyDreams =
+    suenosMesActual.length >= MIN_DREAMS_PER_MONTHLY_ANALYSIS;
+  const currentMonthlyAnalysisIsCached =
+    monthlyAnalysisRecord?.periodKey === currentPeriod.key;
+  const monthlyAnalysisNextAvailableAt =
+    monthlyAnalysisRecord?.nextAvailableAt || 0;
+  const monthlyAnalysisOnCooldown =
+    monthlyAnalysisNextAvailableAt > Date.now();
+  const monthlyAnalysisButtonDisabled =
+    analizandoMensual || !hasMinimumMonthlyDreams || monthlyAnalysisOnCooldown;
+  const monthlyAnalysisGeneratedAt =
+    currentMonthlyAnalysisIsCached
+      ? formatAnalysisDate(monthlyAnalysisRecord?.createdAt)
+      : '';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Tu Lectura Emocional</Text>
-      <Text style={styles.subtitle}>Sueños analizados: {cantidadSuenos}</Text>
+      <Text style={styles.eyebrow}>PATRONES PERSONALES</Text>
+      <Text style={styles.title}>Lo que se repite en tus sueños</Text>
+      <Text style={styles.subtitle}>
+        Señales orientativas basadas en {cantidadSuenos} sueños. Puedes revisar la
+        evidencia y decidir qué tiene sentido para ti.
+      </Text>
 
       {renderRadarChart()}
       {renderEmotionBreakdown()}
@@ -303,19 +535,39 @@ export default function DiagramaEmocional() {
       {selectedEmocion ? getLecturaEmocion() : getLecturaGeneral()}
 
       <View style={styles.analysisSection}>
-        <Text style={styles.sectionTitle}>Análisis mensual</Text>
+        <Text style={styles.sectionTitle}>Lectura profunda del mes</Text>
         <Text style={styles.analysisMeta}>
-          Sueños este mes: {suenosMesActual.length}
+          {`Sueños este mes: ${suenosMesActual.length}/${MIN_DREAMS_PER_MONTHLY_ANALYSIS}`}
         </Text>
+        {!hasMinimumMonthlyDreams && (
+          <Text style={styles.analysisHint}>
+            Guarda {suenosFaltantesAnalisis} sueños más este mes para activar
+            esta lectura.
+          </Text>
+        )}
+        {hasMinimumMonthlyDreams && !subscription.isPremium && (
+          <Text style={styles.analysisHint}>
+            Premium desbloquea una lectura profunda de los cambios, repeticiones
+            y preguntas abiertas del mes.
+          </Text>
+        )}
+        {monthlyAnalysisOnCooldown && (
+          <Text style={styles.analysisHint}>
+            Disponible de nuevo a partir de{' '}
+            {formatRetryAt(monthlyAnalysisNextAvailableAt)}.
+          </Text>
+        )}
         <TouchableOpacity
           style={[
             styles.analysisButton,
-            analizandoMensual && styles.analysisButtonDisabled,
+            monthlyAnalysisButtonDisabled && styles.analysisButtonDisabled,
           ]}
           onPress={generarAnalisisMensual}
-          disabled={analizandoMensual}
+          disabled={monthlyAnalysisButtonDisabled}
         >
-          <Text style={styles.analysisButtonText}>Analizar mes actual</Text>
+          <Text style={styles.analysisButtonText}>
+            {analizandoMensual ? 'Analizando...' : 'Explorar patrones del mes'}
+          </Text>
         </TouchableOpacity>
 
         {analizandoMensual && (
@@ -328,6 +580,13 @@ export default function DiagramaEmocional() {
 
         {!!analisisMensual && (
           <View style={styles.analysisResult}>
+            {!!monthlyAnalysisGeneratedAt && (
+              <Text style={styles.analysisResultMeta}>
+                Generado el {monthlyAnalysisGeneratedAt} con{' '}
+                {monthlyAnalysisRecord?.dreamCount || suenosMesActual.length}{' '}
+                sueños.
+              </Text>
+            )}
             <Markdown>{analisisMensual}</Markdown>
           </View>
         )}
@@ -342,13 +601,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     flexGrow: 1,
   },
+  eyebrow: {
+    color: '#6366F1',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 7,
+  },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#111827',
+    fontSize: 27,
+    fontWeight: '800',
+    lineHeight: 33,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 21,
     marginBottom: 20,
     color: '#666',
   },
@@ -406,8 +675,27 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#111',
   },
+  emotionEvidence: {
+    color: '#64748B',
+    fontSize: 11,
+    marginTop: 7,
+  },
+  detailBox: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 18,
+    padding: 15,
+  },
+  detailLabel: {
+    color: '#6366F1',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+  },
   detailText: {
-    marginTop: 20,
+    marginTop: 8,
     fontSize: 16,
     color: '#444',
     textAlign: 'left',
@@ -432,7 +720,13 @@ const styles = StyleSheet.create({
   analysisMeta: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 14,
+    marginBottom: 8,
+  },
+  analysisHint: {
+    color: '#666',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
   },
   analysisButton: {
     alignSelf: 'flex-start',
@@ -455,5 +749,10 @@ const styles = StyleSheet.create({
   },
   analysisResult: {
     marginTop: 18,
+  },
+  analysisResultMeta: {
+    color: '#666',
+    fontSize: 13,
+    marginBottom: 10,
   },
 });

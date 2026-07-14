@@ -1,4 +1,4 @@
-package com.nicarao.oniria
+package com.nicarao.lunentra
 
 import android.os.Build
 import android.os.Bundle

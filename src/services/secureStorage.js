@@ -2,12 +2,12 @@ import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js';
 
-const ENVELOPE_MARKER = '__oniriaEncrypted';
+const ENVELOPE_MARKER = '__lunentraEncrypted';
 const ENVELOPE_VERSION = 1;
 const ALGORITHM = 'XCHACHA20_POLY1305';
 const KEY_BYTES = 32;
 const NONCE_BYTES = 24;
-const KEYCHAIN_SERVICE = 'oniria.local-data-key';
+const KEYCHAIN_SERVICE = 'lunentra.local-data-key';
 
 const keyCache = new Map();
 let secureStoreAvailable = null;
@@ -62,7 +62,7 @@ const utf8BytesToString = (bytes) => {
   return decodeURIComponent(encoded);
 };
 
-const getSecureStoreKey = (uid) => `oniria.encryption-key.${uid}`;
+const getSecureStoreKey = (uid) => `lunentra.encryption-key.${uid}`;
 
 const ensureSecureStoreAvailable = async () => {
   if (secureStoreAvailable === null) {
