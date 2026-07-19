@@ -8,9 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppIcon from './AppIcon';
 
-const ONBOARDING_IMAGE = require('../../assets/2.png');
+const ONBOARDING_IMAGE = require('../../assets/3.jpeg');
 const ONBOARDING_MARK = require('../../assets/icon.png');
 
 const PAGES = [
@@ -30,13 +31,7 @@ const PAGES = [
     eyebrow: 'RECONOCE PATRONES',
     icon: 'chart',
     title: 'Lo valioso aparece con el tiempo.',
-    text: 'Al sumar registros puedes observar emociones y temas que se repiten o cambian.',
-  },
-  {
-    eyebrow: 'TU INTIMIDAD IMPORTA',
-    icon: 'shield',
-    title: 'Tu diario sigue estando bajo tu control.',
-    text: 'Los registros se guardan cifrados en el dispositivo. Solo se envían a la IA cuando solicitas una lectura.',
+    text: 'Al sumar registros puedes observar cambios y repeticiones. Tu diario se guarda cifrado y solo se envía a la IA cuando solicitas una lectura.',
   },
 ];
 
@@ -61,7 +56,15 @@ export default function OnboardingScreen({ onFinish }) {
         style={styles.background}
         imageStyle={styles.backgroundImage}
       >
-        <View style={styles.scrim} />
+        <LinearGradient
+          colors={[
+            'rgba(3, 9, 20, 0.24)',
+            'rgba(3, 9, 20, 0.42)',
+            'rgba(3, 9, 20, 0.76)',
+          ]}
+          locations={[0, 0.48, 1]}
+          style={styles.scrim}
+        />
 
         <View style={styles.topRow}>
           <View style={styles.brandRow}>
@@ -117,11 +120,10 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   backgroundImage: {
-    opacity: 0.92,
+    opacity: 0.96,
   },
   scrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 9, 20, 0.48)',
   },
   topRow: {
     alignItems: 'center',

@@ -1,0 +1,516 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "De los sueños a un hábito de autoconocimiento",
+    "description": "Recomendación de producto para aumentar la recurrencia y sostener la monetización de Lunentra.",
+    "generatedAt": "2026-07-16T15:28:30.3387206Z",
+    "cards": [],
+    "charts": [
+      {
+        "id": "option_fit_chart",
+        "title": "Filtros de producto superados por opción",
+        "subtitle": "Cribado cualitativo sobre 4 filtros: frecuencia, aprendizaje, diferenciación y riesgo aceptable.",
+        "showDescription": true,
+        "intent": "comparison",
+        "question": "¿Qué opción satisface más condiciones para convertirse en el siguiente bucle de retención de Lunentra?",
+        "rationale": "Un gráfico de barras horizontales compara de forma directa cinco opciones con nombres largos y una escala común de cuatro filtros transparentes.",
+        "comparisonContext": {
+          "unit": "filtros superados",
+          "denominator": "4 filtros cualitativos",
+          "grain": "opción de producto",
+          "semanticFamily": "cribado de priorización"
+        },
+        "type": "horizontalBar",
+        "dataset": "option_priority",
+        "sourceId": "product_synthesis",
+        "valueFormat": "number",
+        "unit": "de 4",
+        "maxRows": 5,
+        "palette": {
+          "kind": "sequential",
+          "name": "blue"
+        },
+        "encodings": {
+          "x": {
+            "field": "option",
+            "type": "nominal",
+            "label": "Opción"
+          },
+          "y": {
+            "field": "fit_score",
+            "type": "quantitative",
+            "label": "Filtros superados"
+          },
+          "tooltip": [
+            {
+              "field": "criteria_met",
+              "type": "text",
+              "label": "Filtros"
+            },
+            {
+              "field": "decision",
+              "type": "text",
+              "label": "Decisión"
+            }
+          ]
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "current_loop_table",
+        "title": "Bucle actual de Lunentra",
+        "subtitle": "Funciones observadas en el repositorio y su efecto sobre la recurrencia.",
+        "dataset": "current_loop",
+        "sourceId": "repo_current",
+        "defaultSort": {
+          "field": "order",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "order",
+            "label": "#",
+            "format": "number"
+          },
+          {
+            "field": "component",
+            "label": "Componente",
+            "type": "text"
+          },
+          {
+            "field": "current_experience",
+            "label": "Experiencia actual",
+            "type": "text"
+          },
+          {
+            "field": "value",
+            "label": "Valor que aporta",
+            "type": "text"
+          },
+          {
+            "field": "retention_gap",
+            "label": "Límite de recurrencia",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "recommended_loop_table",
+        "title": "Arquitectura del bucle recomendado",
+        "subtitle": "Un ciclo completo que funciona incluso cuando el usuario no recuerda ningún sueño.",
+        "dataset": "recommended_loop",
+        "sourceId": "recommended_loop_synthesis",
+        "defaultSort": {
+          "field": "step",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "step",
+            "label": "Paso",
+            "format": "number"
+          },
+          {
+            "field": "moment",
+            "label": "Momento",
+            "type": "text"
+          },
+          {
+            "field": "user_action",
+            "label": "Acción del usuario",
+            "type": "text"
+          },
+          {
+            "field": "immediate_value",
+            "label": "Recompensa inmediata",
+            "type": "text"
+          },
+          {
+            "field": "learning",
+            "label": "Lo que aprende Lunentra",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "option_priority_table",
+        "title": "Comparación de opciones de retención",
+        "subtitle": "Valoración cualitativa según frecuencia, personalización, aprendizaje del núcleo y riesgo.",
+        "dataset": "option_priority",
+        "sourceId": "product_synthesis",
+        "defaultSort": {
+          "field": "rank",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "rank",
+            "label": "Prioridad",
+            "format": "number"
+          },
+          {
+            "field": "option",
+            "label": "Opción",
+            "type": "text"
+          },
+          {
+            "field": "return_trigger",
+            "label": "Motivo para volver",
+            "type": "text"
+          },
+          {
+            "field": "core_learning",
+            "label": "Mejora los patrones",
+            "type": "text"
+          },
+          {
+            "field": "differentiation",
+            "label": "Diferenciación",
+            "type": "text"
+          },
+          {
+            "field": "risk",
+            "label": "Riesgo principal",
+            "type": "text"
+          },
+          {
+            "field": "decision",
+            "label": "Decisión",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "repo_current",
+        "label": "Revisión del producto Lunentra",
+        "path": "reports/retencion-lunentra-2026-07/source-notes.md",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializa las observaciones verificadas en el repositorio sobre el bucle actual.",
+          "executed_at": "2026-07-16T15:28:30.3387206Z",
+          "sql": "SELECT * FROM (VALUES (1, 'Entrada principal', 'Registrar o interpretar un sueño', 'Captura un recuerdo íntimo y permite explorarlo', 'Depende de haber soñado, recordarlo y querer escribir'), (2, 'Inversión personal', 'Emoción al despertar, contexto, resonancia y reflexión', 'Da más peso a la voz del usuario que al simbolismo genérico', 'La inversión ocurre solo alrededor de un sueño'), (3, 'Recompensa acumulada', 'Primer indicio, mapa emocional y lectura profunda con 10 sueños del mes', 'Hace visible que el historial mejora el análisis', 'La recompensa fuerte llega tarde y requiere Premium'), (4, 'Recordatorio', 'Una reflexión general diaria enviada a todos', 'Puede provocar una apertura', 'No responde al estado ni continúa en una acción personalizada'), (5, 'Medición de producto', 'Eventos de cuenta, paywall, compra y guardado manual', 'Permite observar conversión y parte del coste', 'No mide el ciclo de reflexión, retorno semanal ni valor percibido')) AS current_loop(\"order\", component, current_experience, value, retention_gap) ORDER BY \"order\""
+        }
+      },
+      {
+        "id": "recommended_loop_synthesis",
+        "label": "Diseño del bucle Pulso",
+        "path": "reports/retencion-lunentra-2026-07/source-notes.md",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializa los cinco pasos del bucle de producto recomendado.",
+          "executed_at": "2026-07-16T15:28:30.3387206Z",
+          "sql": "SELECT * FROM (VALUES (1, 'Observar', 'Elige emoción, intensidad y necesidad actual', 'Pone nombre a lo que siente en menos de un minuto', 'Estado, intensidad, momento y contexto'), (2, 'Actuar', 'Hace una microacción de 1–3 minutos', 'Recibe ayuda práctica, no solo interpretación', 'Qué estrategia eligió y en qué estado'), (3, 'Comprobar', 'Indica si cambió la intensidad o si le sirvió', 'Reconoce un pequeño cambio o descarta lo que no encaja', 'Respuesta personal a cada estrategia'), (4, 'Conectar', 'Añade un sueño cuando lo recuerda', 'Relaciona la noche con su experiencia del día', 'Puentes entre sueños, emociones y contextos diurnos'), (5, 'Aprender', 'Revisa su semana y elige qué observar después', 'Ve qué se repitió y qué pareció ayudar', 'Preferencias y preguntas para la siguiente semana')) AS recommended_loop(step, moment, user_action, immediate_value, learning) ORDER BY step"
+        }
+      },
+      {
+        "id": "product_synthesis",
+        "label": "Síntesis y criterios de priorización",
+        "path": "reports/retencion-lunentra-2026-07/source-notes.md",
+        "query": {
+          "engine": "duckdb",
+          "language": "sql",
+          "description": "Materializa el cribado cualitativo documentado en las notas de fuente para la visualización comparativa.",
+          "executed_at": "2026-07-16T15:28:30.3387206Z",
+          "sql": "SELECT * FROM (VALUES ('Pulso + microacción + revisión semanal', 4, 'Frecuencia · aprendizaje · diferenciación · riesgo aceptable', 'Construir primero'), ('Check-in emocional sin acción', 3, 'Frecuencia · aprendizaje · riesgo aceptable', 'Usar como base, no como experiencia completa'), ('Retos y constancia flexible', 1, 'Riesgo aceptable si es opcional', 'Añadir después y hacer opcional'), ('Feed diario de consejos y vídeos', 1, 'Riesgo operativo aceptable en versión pequeña', 'No priorizar como función principal'), ('Comunidad y compartición social', 1, 'Disparador frecuente', 'No construir en esta etapa')) AS option_priority(option, fit_score, criteria_met, decision) ORDER BY fit_score DESC, option"
+        }
+      },
+      {
+        "id": "daylio_official",
+        "label": "Daylio: diario, actividades, estadísticas y metas",
+        "href": "https://daylio.net/"
+      },
+      {
+        "id": "how_we_feel_official",
+        "label": "How We Feel: check-ins y estrategias emocionales",
+        "href": "https://apps.apple.com/us/app/how-we-feel/id1562706384"
+      },
+      {
+        "id": "engagement_review",
+        "label": "Revisión sobre adherencia en aplicaciones móviles de salud",
+        "href": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9178451/"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# De los sueños a un hábito de autoconocimiento"
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "body": "## Executive Summary\n\n- **La función que añadiría es un ‘Pulso diario’: un check-in emocional de 30–60 segundos que termina con una microacción personalizada y una comprobación posterior de si ayudó.** Así Lunentra tiene valor aunque el usuario no recuerde un sueño.\n- **No priorizaría un feed de vídeos, consejos o noticias.** Ese contenido puede generar aperturas, pero es fácil de sustituir, no mejora por sí solo el análisis personal y debilita la promesa diferencial de ‘conocerte a través de tus patrones’.\n- **El producto debe cerrar el ciclo cada semana.** Los sueños, los pulsos diurnos, el contexto y el efecto de las microacciones deben convertirse en una revisión breve: qué se repitió, qué pareció ayudar y qué conviene observar después.\n- **La monetización debería ser híbrida.** El registro permanece gratuito; Premium vende inteligencia acumulada, experimentos guiados y personalización. Para el usuario episódico, un informe profundo de pago único evita forzar una suscripción que no encaja con su necesidad."
+      },
+      {
+        "id": "current_finding",
+        "type": "markdown",
+        "sourceId": "repo_current",
+        "body": "## El producto actual tiene profundidad, pero no un disparador frecuente\n\nLunentra ya resuelve bien varias partes difíciles: permite guardar sin IA, recoger la emoción al despertar, añadir contexto personal, valorar si una lectura resonó, escribir una reflexión y revisar patrones. La pantalla inicial, sin embargo, organiza todo alrededor de **registrar un sueño** y de alcanzar **10 sueños en el mes** para la lectura profunda; esa lectura requiere Premium y queda sujeta a un intervalo de 30 días.\n\nEl problema no es la calidad de la propuesta, sino la frecuencia natural del comportamiento. Recordar un sueño es impredecible. El usuario puede valorar mucho Lunentra y aun así no tener motivo para abrirla durante varios días. La notificación diaria existente tampoco corrige esto: se genera un único dato general y se envía a todos los usuarios, sin conectarlo con su estado, sus registros o una acción dentro de la app."
+      },
+      {
+        "id": "current_loop",
+        "type": "table",
+        "tableId": "current_loop_table"
+      },
+      {
+        "id": "recommended_finding",
+        "type": "markdown",
+        "body": "## ‘Pulso’ convierte la observación en utilidad inmediata\n\nEl sistema recomendado empieza con una pregunta que el usuario siempre puede responder: **‘¿Cómo estás ahora?’** El registro debe ser ligero: emoción, intensidad, energía o tensión, contexto opcional y qué necesita en ese momento —calma, claridad, energía, conexión o descanso—.\n\nLunentra responde con una sola microacción de uno a tres minutos: respiración, reencuadre escrito, pausa sensorial, movimiento suave o contacto con alguien. Después pregunta, de forma opcional, si la intensidad cambió. Esa última respuesta es esencial: permite aprender qué ayuda a esa persona, no solo qué siente. Los sueños pasan a ser una fuente especialmente rica dentro del mismo sistema, pero dejan de ser la única puerta de entrada."
+      },
+      {
+        "id": "recommended_loop",
+        "type": "table",
+        "tableId": "recommended_loop_table"
+      },
+      {
+        "id": "market_evidence",
+        "type": "markdown",
+        "body": "## La recurrencia funciona cuando registrar, actuar y aprender están unidos\n\nLos referentes actuales convergen en un patrón útil. [Daylio](https://daylio.net/) reduce el registro diario a elegir estado y actividades, y devuelve estadísticas, correlaciones, metas y recordatorios. [How We Feel](https://apps.apple.com/us/app/how-we-feel/id1562706384) combina check-ins, tendencias personales y estrategias de regulación que pueden completarse en un minuto. Una [revisión de adherencia en mHealth](https://pmc.ncbi.nlm.nih.gov/articles/PMC9178451/) identifica personalización, recordatorios individualizados, autoobservación, visualización y diseño sencillo entre los factores que favorecen el uso continuado.\n\nLa implicación para Lunentra no es copiar un mood tracker. Es usar ese bucle para reforzar su ventaja propia: **relacionar la vida emocional del día con los sueños, las reflexiones confirmadas por el usuario y las acciones que realmente le sirven**."
+      },
+      {
+        "id": "options_finding",
+        "type": "markdown",
+        "body": "## El contenido es una pieza del sistema, no el producto\n\nVídeos, guías y consejos sí pueden aportar valor, pero deben aparecer como respuesta a un pulso concreto o a un patrón observado. Un feed genérico exige producción editorial continua y compite con contenido gratuito disponible en muchas otras plataformas. Además, una apertura provocada por una curiosidad diaria no necesariamente crea inversión personal ni datos útiles.\n\nLa comparación siguiente es un **cribado de producto, no una medición de usuarios**. Cada opción recibe un punto por superar cada uno de cuatro filtros: disparador frecuente, aprendizaje útil para el núcleo, diferenciación y riesgo aceptable en esta etapa. Sirve para hacer explícito el criterio de decisión; la tabla conserva los matices que la puntuación resume."
+      },
+      {
+        "id": "option_fit",
+        "type": "chart",
+        "chartId": "option_fit_chart"
+      },
+      {
+        "id": "option_priority",
+        "type": "table",
+        "tableId": "option_priority_table"
+      },
+      {
+        "id": "monetization",
+        "type": "markdown",
+        "body": "## Monetizar la inteligencia acumulada, no el acto de cuidarse\n\n**Gratis:** pulsos y diario manual ilimitados, registro de sueños, línea temporal básica, revisión semanal sencilla y una selección pequeña de microacciones. Esta capa crea el hábito y los datos que hacen que el producto mejore.\n\n**Premium recurrente:** patrones cruzados entre día y sueño, recomendaciones basadas en lo que previamente ayudó, revisión semanal y mensual avanzada, experimentos guiados de 7 o 14 días, biblioteca completa, exportación y las lecturas profundas con IA ya existentes. La suscripción se justifica porque la personalización evoluciona con el uso.\n\n**Compra puntual:** un ‘Informe de claridad’ profundo para quien llega con una necesidad concreta y no desea continuidad. Puede incluir el análisis de un periodo, preguntas de reflexión y un plan breve. Así Lunentra monetiza tanto al usuario de hábito como al usuario episódico sin empujar a ambos al mismo modelo.\n\nNo recomendaría esconder el Pulso tras Premium: cobrar antes de que se forme el historial reduce precisamente el activo que hace defendible la suscripción."
+      },
+      {
+        "id": "mvp",
+        "type": "markdown",
+        "body": "## MVP: demostrar el bucle antes de producir una biblioteca grande\n\n1. **Añadir un CTA ‘Hacer mi Pulso’ en Inicio**, al mismo nivel que ‘Registrar un sueño’. Debe completarse en menos de un minuto y funcionar sin IA.\n2. **Guardar un modelo local cifrado de check-in:** emoción, intensidad, energía o tensión, calidad de sueño opcional, etiquetas de contexto, necesidad elegida, microacción recomendada y valoración antes/después.\n3. **Crear 12 microacciones curadas**, de uno a tres minutos, agrupadas por calma, claridad, energía, conexión y descanso. Evitar promesas terapéuticas y marcar claramente que son prácticas de bienestar.\n4. **Permitir un recordatorio configurable y amable**, con objetivo flexible de 3–5 observaciones por semana. Mostrar ‘días observados’ en lugar de castigar con una racha perdida.\n5. **Entregar una revisión semanal basada en reglas** al reunir al menos cinco pulsos: emoción más frecuente, contextos asociados, acción mejor valorada y una pregunta para la semana siguiente. No afirmar causalidad.\n6. **Instrumentar el recorrido completo** antes de personalizar con IA: inicio y final del pulso, acción vista y completada, valoración posterior y apertura de la revisión semanal."
+      },
+      {
+        "id": "measurement",
+        "type": "markdown",
+        "body": "## La prueba debe medir hábito útil, no aperturas vacías\n\n**Métrica principal:** porcentaje de nuevos usuarios que completa al menos tres registros significativos —pulso o sueño— en sus primeros siete días y vuelve a observarse en la cuarta semana.\n\n**Métricas de apoyo:** pulsos completados por usuario activo semanal, porcentaje que inicia y termina una microacción, porcentaje que responde la comprobación posterior, apertura de la revisión semanal y conversión a Premium después de recibir al menos una revisión.\n\n**Guardas:** desactivación de notificaciones, abandono durante el pulso, valoraciones de ‘no ayudó’, reportes de contenido inadecuado y frecuencia de mensajes de seguridad. La primera prueba debe comparar el nuevo bucle con la experiencia actual; no conviene fijar objetivos absolutos sin una línea base real de retención."
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## Preguntas que conviene resolver con usuarios reales\n\n- ¿Qué momento produce más valor: mañana, tarde, noche o después de registrar un sueño?\n- ¿El usuario prefiere elegir lo que necesita o recibir directamente una sugerencia?\n- ¿Qué nivel de detalle sigue sintiéndose íntimo pero no pesado?\n- ¿La revisión semanal genera suficiente valor antes de presentar Premium?\n- ¿Hay dos segmentos claros —hábito continuo y consulta episódica— con distinta disposición de pago?"
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "body": "## Supuestos y límites\n\nEsta recomendación se basa en la experiencia implementada y en patrones públicos de producto; el repositorio no contiene cohortes de retención, frecuencia real de sueños, uso de notificaciones ni entrevistas con usuarios. Por eso la prioridad es provisional y debe validarse con instrumentación y una prueba de cuatro semanas.\n\nLunentra debe seguir presentándose como herramienta de reflexión y bienestar, no como diagnóstico o tratamiento. Las correlaciones personales necesitan umbrales mínimos, lenguaje de incertidumbre y evidencia visible. Para usuarios en crisis, las microacciones no sustituyen recursos de emergencia ni atención profesional."
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-16T15:28:30.3387206Z",
+    "status": "ready",
+    "datasets": {
+      "current_loop": [
+        {
+          "order": 1,
+          "component": "Entrada principal",
+          "current_experience": "Registrar o interpretar un sueño",
+          "value": "Captura un recuerdo íntimo y permite explorarlo",
+          "retention_gap": "Depende de haber soñado, recordarlo y querer escribir"
+        },
+        {
+          "order": 2,
+          "component": "Inversión personal",
+          "current_experience": "Emoción al despertar, contexto, resonancia y reflexión",
+          "value": "Da más peso a la voz del usuario que al simbolismo genérico",
+          "retention_gap": "La inversión ocurre solo alrededor de un sueño"
+        },
+        {
+          "order": 3,
+          "component": "Recompensa acumulada",
+          "current_experience": "Primer indicio, mapa emocional y lectura profunda con 10 sueños del mes",
+          "value": "Hace visible que el historial mejora el análisis",
+          "retention_gap": "La recompensa fuerte llega tarde y requiere Premium"
+        },
+        {
+          "order": 4,
+          "component": "Recordatorio",
+          "current_experience": "Una reflexión general diaria enviada a todos",
+          "value": "Puede provocar una apertura",
+          "retention_gap": "No responde al estado ni continúa en una acción personalizada"
+        },
+        {
+          "order": 5,
+          "component": "Medición de producto",
+          "current_experience": "Eventos de cuenta, paywall, compra y guardado manual",
+          "value": "Permite observar conversión y parte del coste",
+          "retention_gap": "No mide el ciclo de reflexión, retorno semanal ni valor percibido"
+        }
+      ],
+      "recommended_loop": [
+        {
+          "step": 1,
+          "moment": "Observar",
+          "user_action": "Elige emoción, intensidad y necesidad actual",
+          "immediate_value": "Pone nombre a lo que siente en menos de un minuto",
+          "learning": "Estado, intensidad, momento y contexto"
+        },
+        {
+          "step": 2,
+          "moment": "Actuar",
+          "user_action": "Hace una microacción de 1–3 minutos",
+          "immediate_value": "Recibe ayuda práctica, no solo interpretación",
+          "learning": "Qué estrategia eligió y en qué estado"
+        },
+        {
+          "step": 3,
+          "moment": "Comprobar",
+          "user_action": "Indica si cambió la intensidad o si le sirvió",
+          "immediate_value": "Reconoce un pequeño cambio o descarta lo que no encaja",
+          "learning": "Respuesta personal a cada estrategia"
+        },
+        {
+          "step": 4,
+          "moment": "Conectar",
+          "user_action": "Añade un sueño cuando lo recuerda",
+          "immediate_value": "Relaciona la noche con su experiencia del día",
+          "learning": "Puentes entre sueños, emociones y contextos diurnos"
+        },
+        {
+          "step": 5,
+          "moment": "Aprender",
+          "user_action": "Revisa su semana y elige qué observar después",
+          "immediate_value": "Ve qué se repitió y qué pareció ayudar",
+          "learning": "Preferencias y preguntas para la siguiente semana"
+        }
+      ],
+      "option_priority": [
+        {
+          "rank": 1,
+          "option": "Pulso + microacción + revisión semanal",
+          "fit_score": 4,
+          "criteria_met": "Frecuencia · aprendizaje · diferenciación · riesgo aceptable",
+          "return_trigger": "Alto y ligado a una necesidad real",
+          "core_learning": "Alto: estado, contexto y respuesta",
+          "differentiation": "Alta al conectarlo con sueños",
+          "risk": "Requiere diseño prudente y umbrales de evidencia",
+          "decision": "Construir primero"
+        },
+        {
+          "rank": 2,
+          "option": "Check-in emocional sin acción",
+          "fit_score": 3,
+          "criteria_met": "Frecuencia · aprendizaje · riesgo aceptable",
+          "return_trigger": "Alto si es muy rápido",
+          "core_learning": "Alto para observación, bajo para saber qué ayuda",
+          "differentiation": "Media; se parece a muchos mood trackers",
+          "risk": "Puede sentirse como registrar por registrar",
+          "decision": "Usar como base, no como experiencia completa"
+        },
+        {
+          "rank": 3,
+          "option": "Retos y constancia flexible",
+          "fit_score": 1,
+          "criteria_met": "Riesgo aceptable si es opcional",
+          "return_trigger": "Medio–alto",
+          "core_learning": "Medio si el reto genera datos útiles",
+          "differentiation": "Media",
+          "risk": "Culpa o conducta mecánica si penaliza fallos",
+          "decision": "Añadir después y hacer opcional"
+        },
+        {
+          "rank": 4,
+          "option": "Feed diario de consejos y vídeos",
+          "fit_score": 1,
+          "criteria_met": "Riesgo operativo aceptable en versión pequeña",
+          "return_trigger": "Medio, basado en novedad",
+          "core_learning": "Bajo si no recoge una respuesta",
+          "differentiation": "Baja; contenido sustituible",
+          "risk": "Coste editorial y menor coherencia de marca",
+          "decision": "No priorizar como función principal"
+        },
+        {
+          "rank": 5,
+          "option": "Comunidad y compartición social",
+          "fit_score": 1,
+          "criteria_met": "Disparador frecuente",
+          "return_trigger": "Potencialmente alto",
+          "core_learning": "Bajo–medio",
+          "differentiation": "Media",
+          "risk": "Privacidad, moderación y seguridad",
+          "decision": "No construir en esta etapa"
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "repo_current",
+      "label": "Revisión del producto Lunentra",
+      "path": "reports/retencion-lunentra-2026-07/source-notes.md",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializa las observaciones verificadas en el repositorio sobre el bucle actual.",
+        "executed_at": "2026-07-16T15:28:30.3387206Z",
+        "sql": "SELECT * FROM (VALUES (1, 'Entrada principal', 'Registrar o interpretar un sueño', 'Captura un recuerdo íntimo y permite explorarlo', 'Depende de haber soñado, recordarlo y querer escribir'), (2, 'Inversión personal', 'Emoción al despertar, contexto, resonancia y reflexión', 'Da más peso a la voz del usuario que al simbolismo genérico', 'La inversión ocurre solo alrededor de un sueño'), (3, 'Recompensa acumulada', 'Primer indicio, mapa emocional y lectura profunda con 10 sueños del mes', 'Hace visible que el historial mejora el análisis', 'La recompensa fuerte llega tarde y requiere Premium'), (4, 'Recordatorio', 'Una reflexión general diaria enviada a todos', 'Puede provocar una apertura', 'No responde al estado ni continúa en una acción personalizada'), (5, 'Medición de producto', 'Eventos de cuenta, paywall, compra y guardado manual', 'Permite observar conversión y parte del coste', 'No mide el ciclo de reflexión, retorno semanal ni valor percibido')) AS current_loop(\"order\", component, current_experience, value, retention_gap) ORDER BY \"order\""
+      }
+    },
+    {
+      "id": "recommended_loop_synthesis",
+      "label": "Diseño del bucle Pulso",
+      "path": "reports/retencion-lunentra-2026-07/source-notes.md",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializa los cinco pasos del bucle de producto recomendado.",
+        "executed_at": "2026-07-16T15:28:30.3387206Z",
+        "sql": "SELECT * FROM (VALUES (1, 'Observar', 'Elige emoción, intensidad y necesidad actual', 'Pone nombre a lo que siente en menos de un minuto', 'Estado, intensidad, momento y contexto'), (2, 'Actuar', 'Hace una microacción de 1–3 minutos', 'Recibe ayuda práctica, no solo interpretación', 'Qué estrategia eligió y en qué estado'), (3, 'Comprobar', 'Indica si cambió la intensidad o si le sirvió', 'Reconoce un pequeño cambio o descarta lo que no encaja', 'Respuesta personal a cada estrategia'), (4, 'Conectar', 'Añade un sueño cuando lo recuerda', 'Relaciona la noche con su experiencia del día', 'Puentes entre sueños, emociones y contextos diurnos'), (5, 'Aprender', 'Revisa su semana y elige qué observar después', 'Ve qué se repitió y qué pareció ayudar', 'Preferencias y preguntas para la siguiente semana')) AS recommended_loop(step, moment, user_action, immediate_value, learning) ORDER BY step"
+      }
+    },
+    {
+      "id": "product_synthesis",
+      "label": "Síntesis y criterios de priorización",
+      "path": "reports/retencion-lunentra-2026-07/source-notes.md",
+      "query": {
+        "engine": "duckdb",
+        "language": "sql",
+        "description": "Materializa el cribado cualitativo documentado en las notas de fuente para la visualización comparativa.",
+        "executed_at": "2026-07-16T15:28:30.3387206Z",
+        "sql": "SELECT * FROM (VALUES ('Pulso + microacción + revisión semanal', 4, 'Frecuencia · aprendizaje · diferenciación · riesgo aceptable', 'Construir primero'), ('Check-in emocional sin acción', 3, 'Frecuencia · aprendizaje · riesgo aceptable', 'Usar como base, no como experiencia completa'), ('Retos y constancia flexible', 1, 'Riesgo aceptable si es opcional', 'Añadir después y hacer opcional'), ('Feed diario de consejos y vídeos', 1, 'Riesgo operativo aceptable en versión pequeña', 'No priorizar como función principal'), ('Comunidad y compartición social', 1, 'Disparador frecuente', 'No construir en esta etapa')) AS option_priority(option, fit_score, criteria_met, decision) ORDER BY fit_score DESC, option"
+      }
+    },
+    {
+      "id": "daylio_official",
+      "label": "Daylio: diario, actividades, estadísticas y metas",
+      "href": "https://daylio.net/"
+    },
+    {
+      "id": "how_we_feel_official",
+      "label": "How We Feel: check-ins y estrategias emocionales",
+      "href": "https://apps.apple.com/us/app/how-we-feel/id1562706384"
+    },
+    {
+      "id": "engagement_review",
+      "label": "Revisión sobre adherencia en aplicaciones móviles de salud",
+      "href": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9178451/"
+    }
+  ]
+}

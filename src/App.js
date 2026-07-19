@@ -27,6 +27,7 @@ export default function App() {
     setModalVisible,
     notificationMessage,
     enableNotifications,
+    deleteAccount,
   } = useAuth();
   const subscription = useSubscriptionState(user);
 
@@ -80,6 +81,7 @@ export default function App() {
             showInfoInterpretation={showInfoInterpretation}
             confirmNewInterpretation={confirmNewInterpretation}
             enableNotifications={enableNotifications}
+            deleteAccount={deleteAccount}
           />
 
           <PremiumPaywallModal subscription={subscription} />

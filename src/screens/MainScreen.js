@@ -45,6 +45,7 @@ import {
 } from '../services/privacyRepository';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
 import { trackProductEvent } from '../services/productAnalytics';
+import { colors, radii, spacing, typography } from '../theme/tokens';
 
 function AssistantMessage({ text, markdownStyle }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -467,6 +468,7 @@ export default function MainScreen({ navigation, route }) {
   const [savedWithoutAi, setSavedWithoutAi] = useState(false);
   const [sourceManualDreamId, setSourceManualDreamId] = useState('');
   const [sourceManualDreamTimestamp, setSourceManualDreamTimestamp] = useState(0);
+  const [optionalContextVisible, setOptionalContextVisible] = useState(false);
 
   const scrollViewRef = useRef(null);
 
@@ -485,6 +487,7 @@ export default function MainScreen({ navigation, route }) {
     setSavedWithoutAi(false);
     setSourceManualDreamId('');
     setSourceManualDreamTimestamp(0);
+    setOptionalContextVisible(false);
     scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   };
 
@@ -523,6 +526,7 @@ export default function MainScreen({ navigation, route }) {
     setDescripcion(manualDream.description);
     setWakingEmotion(manualDream.wakingEmotion || '');
     setWakingContext(manualDream.wakingContext || '');
+    setOptionalContextVisible(Boolean(manualDream.wakingEmotion || manualDream.wakingContext));
     setSourceManualDreamId(manualDream.id);
     setSourceManualDreamTimestamp(
       manualDream.createdAt || manualDream.timestamp || 0
@@ -658,6 +662,10 @@ export default function MainScreen({ navigation, route }) {
         setSourceManualDreamId('');
         setSourceManualDreamTimestamp(0);
         subscription.refresh();
+        trackProductEvent('dream_interpretation_completed', {
+          accountType: subscription.isGuest ? 'guest' :
+            subscription.isPremium ? 'premium' : 'free',
+        });
         if (subscription.isGuest) {
           trackProductEvent('guest_demo_completed');
         }
@@ -798,6 +806,7 @@ export default function MainScreen({ navigation, route }) {
         resonance: updatedDream.resonance,
       }));
       setReflectionStatus('saved');
+      trackProductEvent('reflection_saved', { source: 'interpretation-flow' });
     } catch (error) {
       console.error('Error guardando la reflexión personal:', error);
       setReflectionStatus('error');
@@ -808,7 +817,8 @@ export default function MainScreen({ navigation, route }) {
     body: {
       fontSize: 16,
       fontFamily: 'System',
-      color: '#333',
+      color: colors.ink,
+      lineHeight: 24,
     },
     strong: {
       fontWeight: 'bold',
@@ -816,13 +826,14 @@ export default function MainScreen({ navigation, route }) {
     text: {
       fontSize: 16,
       fontFamily: 'System',
-      color: '#333',
+      color: colors.ink,
     },
     paragraph: {
       fontSize: 16,
       fontFamily: 'System',
-      color: '#333',
-      marginBottom: 10,
+      color: colors.ink,
+      lineHeight: 24,
+      marginBottom: 12,
     },
   };
 
@@ -895,15 +906,12 @@ export default function MainScreen({ navigation, route }) {
         ]}
       >
         <Text style={styles.composerLabel}>
-          {isInitialComposer ? 'Tu sueño' : 'Tu ampliación'}
+          {isInitialComposer ? '1 · Lo que recuerdas' : 'Tu ampliación'}
         </Text>
         {isInitialComposer ? (
           <View style={styles.usageBanner}>
             <Text style={styles.usageBannerTitle}>
               {interpretationAvailabilityLabel}
-            </Text>
-            <Text style={styles.usageBannerText}>
-              Guardar este sueño sin interpretarlo no consume una lectura.
             </Text>
           </View>
         ) : null}
@@ -929,6 +937,26 @@ export default function MainScreen({ navigation, route }) {
           textAlignVertical="top"
         />
         {isInitialComposer ? (
+          <TouchableOpacity
+            style={styles.optionalContextToggle}
+            onPress={() => setOptionalContextVisible(current => !current)}
+          >
+            <View style={styles.optionalContextToggleCopy}>
+              <Text style={styles.optionalContextToggleTitle}>
+                2 · Añadir emoción y contexto
+              </Text>
+              <Text style={styles.optionalContextToggleHint}>
+                Opcional · hace la lectura más personal
+              </Text>
+            </View>
+            <AppIcon
+              name={optionalContextVisible ? 'chevronUp' : 'chevronDown'}
+              size={19}
+              color={colors.muted}
+            />
+          </TouchableOpacity>
+        ) : null}
+        {isInitialComposer && optionalContextVisible ? (
           <View style={styles.optionalContextSection}>
             <Text style={styles.optionalContextTitle}>
               ¿Cómo te sentiste al despertar?
@@ -994,8 +1022,9 @@ export default function MainScreen({ navigation, route }) {
             onPress={guardarSinInterpretacion}
             disabled={!descripcionLista || cargando}
           >
-            <AppIcon name="bookmark" size={17} color="#4338CA" />
-            <Text style={styles.manualSaveButtonText}>Guardar sin usar IA</Text>
+            <Text style={styles.manualSaveButtonText}>
+              Guardar en el diario sin usar IA
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -1018,11 +1047,11 @@ export default function MainScreen({ navigation, route }) {
           {mostrarIntroInicial && (
             <View style={styles.initialIntro}>
               <Text style={styles.title}>
-                Explora lo que tu sueño puede estar reflejando
+                Cuéntame lo que recuerdas
               </Text>
               <Text style={styles.subtitle}>
-                No hay una única respuesta. Cuantos más detalles y asociaciones
-                personales compartas, más útil será la reflexión.
+                No hace falta reconstruirlo entero. Empieza por una escena, una
+                persona, una sensación o el detalle que siga contigo.
               </Text>
             </View>
           )}
@@ -1183,7 +1212,7 @@ export default function MainScreen({ navigation, route }) {
                 style={styles.newDreamButton}
                 onPress={reiniciarInterpretacion}
               >
-                <AppIcon name="refresh" size={18} color="#fff" />
+                <AppIcon name="plusCircle" size={18} color="#fff" />
                 <Text style={styles.newDreamButtonText}>
                   Registrar otro sueño
                 </Text>
@@ -1219,48 +1248,41 @@ export default function MainScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
   },
   innerContainer: {
     flex: 1,
   },
   messagesScrollView: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
   },
   messagesContent: {
-    paddingVertical: 20,
+    paddingVertical: spacing.xl,
   },
   initialMessagesContent: {
     justifyContent: 'center',
   },
   initialIntro: {
     alignSelf: 'center',
-    marginBottom: 22,
+    marginBottom: spacing.xxl,
     maxWidth: 520,
     width: '100%',
   },
   title: {
-    color: '#111',
-    fontSize: 29,
-    fontWeight: '800',
-    lineHeight: 35,
-    marginBottom: 8,
+    ...typography.title,
+    color: colors.ink,
+    marginBottom: spacing.sm,
     textAlign: 'left',
   },
   subtitle: {
-    color: '#5F6368',
-    fontSize: 15,
-    lineHeight: 22,
+    ...typography.body,
+    color: colors.muted,
   },
   composerContainer: {
     alignSelf: 'center',
-    backgroundColor: '#F7F7F7',
-    borderColor: '#E5E5E5',
-    borderRadius: 8,
-    borderWidth: 1,
+    backgroundColor: 'transparent',
     maxWidth: 520,
-    padding: 14,
     width: '100%',
   },
   initialComposerContainer: {
@@ -1271,22 +1293,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   composerLabel: {
-    color: '#222',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
+    ...typography.eyebrow,
+    color: colors.primary,
+    marginBottom: spacing.sm,
   },
   usageBanner: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 8,
-    marginBottom: 10,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
+    marginBottom: spacing.sm,
   },
   usageBannerTitle: {
-    color: '#3730A3',
-    fontSize: 12,
-    fontWeight: '800',
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
   },
   usageBannerText: {
     color: '#6366F1',
@@ -1295,16 +1312,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   composerInput: {
-    backgroundColor: '#fff',
-    borderColor: '#DADADA',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.md,
     borderWidth: 1,
-    color: '#333',
+    color: colors.ink,
     fontSize: 16,
     fontFamily: 'System',
     lineHeight: 22,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
   },
   initialInput: {
     minHeight: 170,
@@ -1313,18 +1330,39 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   optionalContextSection: {
-    borderTopColor: '#E2E8F0',
-    borderTopWidth: 1,
-    marginTop: 14,
-    paddingTop: 14,
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radii.md,
+    marginTop: spacing.sm,
+    padding: spacing.lg,
+  },
+  optionalContextToggle: {
+    alignItems: 'center',
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    minHeight: 62,
+    paddingVertical: spacing.sm,
+  },
+  optionalContextToggleCopy: {
+    flex: 1,
+  },
+  optionalContextToggleTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  optionalContextToggleHint: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 3,
   },
   optionalContextTitle: {
-    color: '#222',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   optionalContextHint: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 4,
@@ -1336,32 +1374,32 @@ const styles = StyleSheet.create({
     marginTop: 11,
   },
   emotionChip: {
-    backgroundColor: '#fff',
-    borderColor: '#CBD5E1',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
   emotionChipSelected: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#4F46E5',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   emotionChipText: {
-    color: '#475569',
+    color: colors.muted,
     fontSize: 12,
     textTransform: 'capitalize',
   },
   emotionChipTextSelected: {
-    color: '#3730A3',
+    color: colors.white,
     fontWeight: '800',
   },
   wakingContextInput: {
-    backgroundColor: '#fff',
-    borderColor: '#DADADA',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.md,
     borderWidth: 1,
-    color: '#333',
+    color: colors.ink,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 11,
@@ -1372,8 +1410,8 @@ const styles = StyleSheet.create({
   primaryActionButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: '#000',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 12,
@@ -1381,7 +1419,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   primaryActionDisabled: {
-    backgroundColor: '#9B9B9B',
+    opacity: 0.35,
   },
   primaryActionText: {
     color: '#fff',
@@ -1391,9 +1429,6 @@ const styles = StyleSheet.create({
   },
   manualSaveButton: {
     alignItems: 'center',
-    borderColor: '#C7D2FE',
-    borderRadius: 8,
-    borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 8,
@@ -1404,28 +1439,25 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   manualSaveButtonText: {
-    color: '#4338CA',
-    fontSize: 14,
+    color: colors.primary,
+    fontSize: 13,
     fontWeight: '800',
-    marginLeft: 7,
   },
   message: {
-    marginBottom: 12,
-    padding: 10,
-    borderRadius: 8,
+    marginBottom: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   userMessage: {
     alignSelf: 'center',
-    backgroundColor: '#F5F5F5',
-    borderLeftColor: '#111',
-    borderLeftWidth: 3,
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radii.md,
     maxWidth: '100%',
-    paddingHorizontal: 13,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     width: '100%',
   },
   chatgptMessage: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     alignSelf: 'center',
     width: '100%',
     maxWidth: '100%',
@@ -1435,11 +1467,11 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     fontFamily: 'System',
-    color: '#333',
+    color: colors.ink,
     lineHeight: 22,
   },
   userMessageLabel: {
-    color: '#666',
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 5,
@@ -1455,10 +1487,8 @@ const styles = StyleSheet.create({
   },
   reflectionCard: {
     alignSelf: 'center',
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: colors.warmSoft,
+    borderRadius: radii.lg,
     marginBottom: 18,
     marginTop: 8,
     maxWidth: 520,
@@ -1466,19 +1496,19 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   reflectionEyebrow: {
-    color: '#6366F1',
+    color: colors.warm,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
   },
   reflectionTitle: {
-    color: '#111827',
+    color: colors.ink,
     fontSize: 19,
     fontWeight: '800',
     marginTop: 6,
   },
   reflectionHint: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 6,
@@ -1490,16 +1520,16 @@ const styles = StyleSheet.create({
     marginTop: 13,
   },
   resonanceButton: {
-    backgroundColor: '#fff',
-    borderColor: '#CBD5E1',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: 18,
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
   resonanceButtonSelected: {
-    backgroundColor: '#4338CA',
-    borderColor: '#4338CA',
+    backgroundColor: colors.warm,
+    borderColor: colors.warm,
   },
   resonanceButtonText: {
     color: '#475569',
@@ -1510,11 +1540,11 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   reflectionInput: {
-    backgroundColor: '#fff',
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.md,
     borderWidth: 1,
-    color: '#111827',
+    color: colors.ink,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 12,
@@ -1524,8 +1554,8 @@ const styles = StyleSheet.create({
   saveReflectionButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#4338CA',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     justifyContent: 'center',
     marginTop: 11,
     minHeight: 42,
@@ -1551,33 +1581,33 @@ const styles = StyleSheet.create({
   },
   accountUpgradeCard: {
     alignSelf: 'center',
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.lg,
     marginBottom: 16,
     maxWidth: 520,
     padding: 16,
     width: '100%',
   },
   accountUpgradeTitle: {
-    color: '#312E81',
+    color: colors.ink,
     fontSize: 16,
     fontWeight: '800',
   },
   accountUpgradeText: {
-    color: '#4F46E5',
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 5,
   },
   accountUpgradeAction: {
-    color: '#312E81',
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '800',
     marginTop: 9,
   },
   typingIndicator: {
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 18,
     flexDirection: 'row',
     minHeight: 34,
@@ -1606,8 +1636,8 @@ const styles = StyleSheet.create({
   newDreamButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#000',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
@@ -1633,8 +1663,8 @@ const styles = StyleSheet.create({
   },
   followUpButton: {
     alignItems: 'center',
-    backgroundColor: '#000',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     flexDirection: 'row',
     justifyContent: 'center',
     minHeight: 46,

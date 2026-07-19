@@ -28,9 +28,10 @@ const PREMIUM_DAILY_INTERPRETATION_LIMIT = 2;
 const MONTHLY_EMOTIONAL_ANALYSIS_MIN_DREAMS = 10;
 const MONTHLY_EMOTIONAL_ANALYSIS_LIMIT_MS = 30 * DAY_IN_MS;
 const MONTHLY_EMOTIONAL_ANALYSIS_RESERVATION_TTL_MS = 10 * 60 * 1000;
+const RECENT_AUTH_MAX_AGE_MS = 15 * 60 * 1000;
 const REVENUECAT_API_URL = "https://api.revenuecat.com/v1";
 const REVENUECAT_ENTITLEMENT_ID =
-  process.env.REVENUECAT_ENTITLEMENT_ID || "premium";
+  process.env.REVENUECAT_ENTITLEMENT_ID || "Premium";
 const PRODUCT_EVENT_NAMES = new Set([
   "account_conversion_completed",
   "account_cta_clicked",
@@ -67,6 +68,24 @@ function requireAuth(request) {
     throw new HttpsError(
         "unauthenticated",
         "Debes iniciar sesión para usar esta función.",
+    );
+  }
+}
+
+function requireRecentAuthentication(request) {
+  const authTimeSeconds = Number(request.auth?.token?.auth_time);
+  const authTimeMs = authTimeSeconds * 1000;
+  const authAgeMs = Date.now() - authTimeMs;
+
+  if (
+    !Number.isFinite(authTimeMs) ||
+    authAgeMs < 0 ||
+    authAgeMs > RECENT_AUTH_MAX_AGE_MS
+  ) {
+    throw new HttpsError(
+        "failed-precondition",
+        "Vuelve a iniciar sesion antes de eliminar tu cuenta.",
+        {reason: "recent-login-required"},
     );
   }
 }
@@ -243,15 +262,46 @@ async function deleteAuthUser(uid) {
   }
 }
 
-async function deleteAnonymousAccount(uid) {
+async function deletePrivateUserState(uid) {
+  const productEventRateRef = admin.firestore()
+      .collection("privateProductEventRate")
+      .doc(uid);
+  const migrationsRef = admin.firestore()
+      .collection("privateAnonymousMigrations");
+  const [targetMigrations, sourceMigration] = await Promise.all([
+    migrationsRef.where("targetUid", "==", uid).get(),
+    migrationsRef.doc(uid).get(),
+  ]);
+  const migrationRefs = new Map();
+
+  targetMigrations.docs.forEach((doc) => {
+    migrationRefs.set(doc.ref.path, doc.ref);
+  });
+  if (sourceMigration.exists) {
+    migrationRefs.set(sourceMigration.ref.path, sourceMigration.ref);
+  }
+
   await deleteUserFirestoreTree(uid);
   await Promise.all([
     getAiUsageRef(uid).delete(),
     getPrivateEntitlementRef(uid).delete(),
-    admin.firestore().collection("privateProductEventRate").doc(uid).delete(),
+    admin.firestore().recursiveDelete(productEventRateRef),
+    ...Array.from(migrationRefs.values()).map((ref) => ref.delete()),
   ]);
+}
+
+async function deleteUserAccount(uid, revenueCatApiKey = "") {
+  if (revenueCatApiKey) {
+    await deleteRevenueCatCustomer(revenueCatApiKey, uid);
+  }
+
+  await deletePrivateUserState(uid);
   await deleteUserStorageFiles(uid);
   await deleteAuthUser(uid);
+}
+
+async function deleteAnonymousAccount(uid) {
+  await deleteUserAccount(uid);
 }
 
 function getUserMetadataTime(userRecord) {
@@ -538,6 +588,31 @@ async function fetchRevenueCatSubscriber(apiKey, appUserId) {
     return response.data?.subscriber || null;
   } catch (error) {
     if (error?.response?.status === 404) return null;
+    throw error;
+  }
+}
+
+async function deleteRevenueCatCustomer(apiKey, appUserId) {
+  if (!apiKey) {
+    throw new HttpsError(
+        "failed-precondition",
+        "RevenueCat no esta configurado en el servidor.",
+        {reason: "revenuecat-not-configured"},
+    );
+  }
+
+  try {
+    await axios.delete(
+        `${REVENUECAT_API_URL}/subscribers/${encodeURIComponent(appUserId)}`,
+        {
+          headers: {
+            "Authorization": getRevenueCatAuthorizationHeader(apiKey),
+          },
+          timeout: 15000,
+        },
+    );
+  } catch (error) {
+    if (error?.response?.status === 404) return;
     throw error;
   }
 }
@@ -1467,6 +1542,41 @@ exports.deleteAnonymousUserData = onCall(
         throw new HttpsError(
             "internal",
             "No se pudieron borrar los datos de la cuenta invitada.",
+        );
+      }
+    },
+);
+
+exports.deleteUserAccountData = onCall(
+    {
+      region: REGION,
+      secrets: [revenueCatRestApiKey],
+      timeoutSeconds: 120,
+    },
+    async (request) => {
+      requireAuth(request);
+
+      const userRecord = await admin.auth().getUser(request.auth.uid);
+      const isAnonymous = isAnonymousAuthToken(request.auth.token) ||
+        isAnonymousUserRecord(userRecord);
+
+      if (!isAnonymous) {
+        requireRecentAuthentication(request);
+      }
+
+      try {
+        await deleteUserAccount(
+            request.auth.uid,
+            isAnonymous ? "" : revenueCatRestApiKey.value(),
+        );
+        return {deleted: true};
+      } catch (error) {
+        if (error instanceof HttpsError) throw error;
+
+        console.error("Error borrando cuenta de usuario:", error);
+        throw new HttpsError(
+            "internal",
+            "No se pudo eliminar la cuenta completa.",
         );
       }
     },

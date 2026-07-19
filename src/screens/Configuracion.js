@@ -18,8 +18,12 @@ import {
   revokeMonthlyAnalysisPrivacyNotice,
 } from '../services/privacyRepository';
 import { clearCurrentUserLocalData } from '../services/userStorage';
+import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
 
 const PRIVACY_POLICY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || '';
+const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || '';
+const ACCOUNT_DELETION_URL =
+  process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL || '';
 
 function InformationRow({ icon, title, text }) {
   return (
@@ -35,7 +39,11 @@ function InformationRow({ icon, title, text }) {
   );
 }
 
-export default function Configuracion({ enableNotifications }) {
+export default function Configuracion({
+  user,
+  enableNotifications,
+  deleteAccount,
+}) {
   const { clearRespuestas } = useContext(GlobalContext);
   const [aiConsent, setAiConsent] = useState(false);
   const [monthlyConsent, setMonthlyConsent] = useState(false);
@@ -106,16 +114,25 @@ export default function Configuracion({ enableNotifications }) {
     }
   };
 
-  const handleOpenPrivacyPolicy = async () => {
-    if (!PRIVACY_POLICY_URL) return;
+  const openExternalUrl = async (url, label) => {
+    if (!url) return;
 
-    const supported = await Linking.canOpenURL(PRIVACY_POLICY_URL);
+    const supported = await Linking.canOpenURL(url);
     if (supported) {
-      await Linking.openURL(PRIVACY_POLICY_URL);
+      await Linking.openURL(url);
     } else {
-      Alert.alert('Enlace no disponible', 'No se pudo abrir la política de privacidad.');
+      Alert.alert('Enlace no disponible', `No se pudo abrir ${label}.`);
     }
   };
+
+  const handleOpenPrivacyPolicy = () =>
+    openExternalUrl(PRIVACY_POLICY_URL, 'la política de privacidad');
+
+  const handleOpenTerms = () =>
+    openExternalUrl(TERMS_URL, 'los términos de uso');
+
+  const handleOpenAccountDeletion = () =>
+    openExternalUrl(ACCOUNT_DELETION_URL, 'la página de eliminación de cuenta');
 
   const handleClearLocalData = () => {
     Alert.alert(
@@ -128,7 +145,7 @@ export default function Configuracion({ enableNotifications }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              setBusyAction('delete');
+              setBusyAction('deleteLocal');
               await clearCurrentUserLocalData();
               clearRespuestas();
               setAiConsent(false);
@@ -140,6 +157,60 @@ export default function Configuracion({ enableNotifications }) {
             } finally {
               setBusyAction('');
             }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    if (!deleteAccount || !user || user.isAnonymous) return;
+
+    Alert.alert(
+      'Eliminar cuenta de Lunentra',
+      'Se eliminarán tu cuenta, los datos asociados en Firebase y tu perfil de RevenueCat. Esta acción no cancela una suscripción activa de Google Play.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Continuar',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Confirmación final',
+              'La eliminación es permanente. Si tienes Premium, cancela también la suscripción desde Google Play para evitar futuras renovaciones.',
+              [
+                { text: 'Volver', style: 'cancel' },
+                {
+                  text: 'Eliminar definitivamente',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      setBusyAction('deleteAccount');
+                      await deleteAccount();
+                      clearRespuestas();
+                      setAiConsent(false);
+                      setMonthlyConsent(false);
+                      Alert.alert(
+                        'Cuenta eliminada',
+                        'Tu cuenta y sus datos asociados se han eliminado.'
+                      );
+                    } catch (error) {
+                      const needsRecentLogin =
+                        error?.details?.reason === 'recent-login-required' ||
+                        error?.message?.includes('Vuelve a iniciar sesion');
+                      Alert.alert(
+                        needsRecentLogin ? 'Vuelve a iniciar sesión' : 'Error',
+                        needsRecentLogin
+                          ? 'Por seguridad, cierra sesión, vuelve a entrar y repite la eliminación en los próximos 15 minutos.'
+                          : 'No se pudo eliminar la cuenta completa. No se ha cerrado la sesión para que puedas volver a intentarlo.'
+                      );
+                    } finally {
+                      setBusyAction('');
+                    }
+                  },
+                },
+              ]
+            );
           },
         },
       ]
@@ -166,7 +237,7 @@ export default function Configuracion({ enableNotifications }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Cómo se usan tus datos</Text>
         <InformationRow
-          icon="shield"
+          icon="lock"
           title="Guardado local cifrado"
           text="Tu diario, contexto y patrones se almacenan protegidos en este dispositivo."
         />
@@ -263,7 +334,43 @@ export default function Configuracion({ enableNotifications }) {
             </Text>
           </View>
         )}
+        {!!TERMS_URL && (
+          <TouchableOpacity style={styles.linkButton} onPress={handleOpenTerms}>
+            <Text style={styles.linkButtonText}>Leer términos de uso</Text>
+            <AppIcon name="arrowRight" size={17} color="#4338CA" />
+          </TouchableOpacity>
+        )}
+        {!!ACCOUNT_DELETION_URL && (
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={handleOpenAccountDeletion}
+          >
+            <Text style={styles.linkButtonText}>Eliminación de cuenta en la web</Text>
+            <AppIcon name="arrowRight" size={17} color="#4338CA" />
+          </TouchableOpacity>
+        )}
       </View>
+
+      {user && !user.isAnonymous && (
+        <View style={[styles.section, styles.dangerSection]}>
+          <Text style={styles.dangerTitle}>Eliminar mi cuenta</Text>
+          <Text style={styles.sectionDescription}>
+            Elimina la cuenta, sus datos remotos y el contenido local de este
+            dispositivo. Una suscripción de Google Play debe cancelarse por separado.
+          </Text>
+          <TouchableOpacity
+            style={styles.dangerButton}
+            onPress={handleDeleteAccount}
+            disabled={busyAction === 'deleteAccount'}
+          >
+            {busyAction === 'deleteAccount' ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.dangerButtonText}>Eliminar mi cuenta</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={[styles.section, styles.dangerSection]}>
         <Text style={styles.dangerTitle}>Borrar el contenido de este dispositivo</Text>
@@ -274,9 +381,9 @@ export default function Configuracion({ enableNotifications }) {
         <TouchableOpacity
           style={styles.dangerButton}
           onPress={handleClearLocalData}
-          disabled={busyAction === 'delete'}
+          disabled={busyAction === 'deleteLocal'}
         >
-          {busyAction === 'delete' ? (
+          {busyAction === 'deleteLocal' ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <Text style={styles.dangerButtonText}>Borrar datos locales</Text>
@@ -289,53 +396,43 @@ export default function Configuracion({ enableNotifications }) {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.lg,
     paddingBottom: 36,
   },
   heroCard: {
-    backgroundColor: '#07111F',
-    borderRadius: 16,
-    marginBottom: 14,
-    padding: 20,
+    marginBottom: spacing.xxl,
   },
   eyebrow: {
-    color: '#A5B4FC',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
+    ...typography.eyebrow,
+    color: colors.primary,
   },
   heroTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '800',
-    lineHeight: 30,
-    marginTop: 8,
+    ...typography.title,
+    color: colors.ink,
+    marginTop: spacing.sm,
   },
   heroText: {
-    color: '#CBD5E1',
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
+    ...typography.body,
+    color: colors.muted,
+    marginTop: spacing.sm,
   },
   section: {
-    backgroundColor: '#fff',
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 12,
-    padding: 16,
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    marginBottom: spacing.xxl,
+    paddingBottom: spacing.xxl,
   },
   sectionTitle: {
-    color: '#111827',
-    fontSize: 17,
-    fontWeight: '800',
+    ...typography.sectionTitle,
+    color: colors.ink,
   },
   sectionDescription: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 13,
     lineHeight: 20,
     marginTop: 7,
@@ -347,7 +444,7 @@ const styles = StyleSheet.create({
   },
   informationIcon: {
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primarySoft,
     borderRadius: 9,
     height: 38,
     justifyContent: 'center',
@@ -358,12 +455,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   informationTitle: {
-    color: '#111827',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   informationText: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 3,
@@ -374,18 +471,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionMeta: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 12,
     marginTop: 4,
   },
   statusBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 12,
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
   statusBadgeActive: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successSoft,
   },
   statusBadgeText: {
     color: '#64748B',
@@ -393,12 +490,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   statusBadgeTextActive: {
-    color: '#047857',
+    color: colors.success,
   },
   outlineButton: {
     alignItems: 'center',
-    borderColor: '#C7D2FE',
-    borderRadius: 8,
+    borderColor: colors.primary,
+    borderRadius: radii.md,
     borderWidth: 1,
     justifyContent: 'center',
     marginTop: 14,
@@ -406,15 +503,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   outlineButtonText: {
-    color: '#4338CA',
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '800',
   },
   primaryButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#4338CA',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     justifyContent: 'center',
     marginTop: 13,
     minHeight: 44,
@@ -431,15 +528,15 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   linkButtonText: {
-    color: '#4338CA',
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '800',
     marginRight: 7,
   },
   pendingPolicyBox: {
-    backgroundColor: '#FFF7ED',
-    borderColor: '#FED7AA',
-    borderRadius: 8,
+    backgroundColor: colors.warningSoft,
+    borderColor: colors.warm,
+    borderRadius: radii.md,
     borderWidth: 1,
     marginTop: 13,
     padding: 11,
@@ -450,18 +547,18 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   dangerSection: {
-    borderColor: '#FECACA',
+    borderBottomColor: colors.danger,
   },
   dangerTitle: {
-    color: '#991B1B',
+    color: colors.danger,
     fontSize: 17,
     fontWeight: '800',
   },
   dangerButton: {
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#991B1B',
-    borderRadius: 8,
+    backgroundColor: colors.danger,
+    borderRadius: radii.md,
     justifyContent: 'center',
     marginTop: 14,
     minHeight: 44,

@@ -4,17 +4,25 @@ import { NavigationContainer } from '@react-navigation/native';
 import { View, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import Perfil from '../screens/Perfil';
 import SuenosGuardados from '../screens/SuenosGuardados';
+import DreamDetail from '../screens/DreamDetail';
 import HomeScreen from '../components/HomeScreen';
 import MainScreen from '../screens/MainScreen';
 import DiagramaEmocional from '../screens/DiagramaEmocional';
 import Configuracion from '../screens/Configuracion';
 import PlanPremium from '../screens/PlanPremium';
 import RestoreAnswersButton from '../components/RestoreAnswersButton';
-import DropdownMenu from '../components/DropdownMenu';
 import AppIcon from '../components/AppIcon';
+import BottomNavigation from '../components/BottomNavigation';
 import { navigationRef } from '../utils/navigationRef';
+import { colors } from '../theme/tokens';
 
 const Stack = createStackNavigator();
+const ROOT_TAB_ROUTES = new Set([
+  'Home',
+  'SuenosGuardados',
+  'DiagramaEmocional',
+  'Perfil',
+]);
 
 export default function StackNavigator({
   user,
@@ -31,40 +39,49 @@ export default function StackNavigator({
   showInfoInterpretation,
   confirmNewInterpretation,
   enableNotifications,
+  deleteAccount,
 }) {
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [currentRoute, setCurrentRoute] = useState('Home');
 
-  const handleCloseMenu = () => setMenuVisible(false);
+  const updateCurrentRoute = () => {
+    const routeName = navigationRef.getCurrentRoute()?.name;
+    if (routeName) setCurrentRoute(routeName);
+  };
+
+  const handleRootNavigation = routeName => {
+    if (!navigationRef.isReady()) return;
+    navigationRef.navigate(routeName);
+  };
 
   return (
     <View style={{ flex: 1 }}>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={updateCurrentRoute}
+        onStateChange={updateCurrentRoute}
+      >
         <Stack.Navigator
           initialRouteName="Home"
           screenOptions={{
             headerStyle: {
+              backgroundColor: colors.background,
               elevation: 0,
               shadowOpacity: 0,
               borderBottomWidth: 0,
             },
+            headerTintColor: colors.ink,
+            headerTitleStyle: {
+              fontSize: 17,
+              fontWeight: '800',
+            },
+            cardStyle: { backgroundColor: colors.background },
           }}
         >
         <Stack.Screen
           name="Home"
           options={{
             title: 'Lunentra',
-            headerShown: Boolean(user),
-            headerLeft: () => (
-              <TouchableOpacity
-                onPress={() => setMenuVisible(v => !v)}
-                accessibilityLabel="Abrir menu"
-                accessibilityRole="button"
-                hitSlop={8}
-                style={{ marginLeft: 10, padding: 8 }}
-              >
-                <AppIcon name="menu" size={24} color="black" />
-              </TouchableOpacity>
-            ),
+            headerShown: false,
           }}
         >
           {props => (
@@ -92,10 +109,10 @@ export default function StackNavigator({
               <View style={{ flexDirection: 'row' }}>
                 <TouchableOpacity
                   onPress={confirmNewInterpretation}
-                  accessibilityLabel="Reiniciar registro"
+                  accessibilityLabel="Empezar una nueva interpretación"
                   style={{ marginRight: 6, padding: 8 }}
                 >
-                  <AppIcon name="refresh" size={22} color="black" />
+                  <AppIcon name="plusCircle" size={22} color={colors.ink} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={showInfoInterpretation}
@@ -111,9 +128,8 @@ export default function StackNavigator({
 
         <Stack.Screen
           name="Perfil"
-          component={Perfil}
           options={{
-            title: 'Mi contexto',
+            title: 'Tu espacio',
             headerRight: () => (
               <View style={{ flexDirection: 'row' }}>
                 <RestoreAnswersButton />
@@ -123,7 +139,15 @@ export default function StackNavigator({
               </View>
             ),
           }}
-        />
+        >
+          {props => (
+            <Perfil
+              {...props}
+              user={user}
+              signOut={signOut}
+            />
+          )}
+        </Stack.Screen>
 
         <Stack.Screen
           name="SuenosGuardados"
@@ -136,18 +160,11 @@ export default function StackNavigator({
               <View style={{ flexDirection: 'row' }}>
                 {/* Botón de calendario */}
                 <TouchableOpacity
-                  onPress={() => DeviceEventEmitter.emit('toggleCalendarView')}
-                  style={{ marginRight: 10, padding: 8 }}
-                >
-                  <AppIcon name="calendar" size={24} color="black" />
-                </TouchableOpacity>
-
-                {/* Botón de borrar */}
-                <TouchableOpacity
                   onPress={() => DeviceEventEmitter.emit('enableSelectionMode')}
+                  accessibilityLabel="Seleccionar sueños para borrar"
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <AppIcon name="trash" size={24} color="black" />
+                  <AppIcon name="trash" size={22} color={colors.muted} />
                 </TouchableOpacity>
               </View>
             );
@@ -157,15 +174,17 @@ export default function StackNavigator({
               <View style={{ flexDirection: 'row' }}>
                 <TouchableOpacity
                   onPress={() => DeviceEventEmitter.emit('cancelSelectionMode')}
+                  accessibilityLabel="Cancelar selección"
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <AppIcon name="close" size={24} color="black" />
+                  <AppIcon name="close" size={22} color={colors.muted} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => DeviceEventEmitter.emit('confirmDeletion')}
+                  accessibilityLabel="Borrar sueños seleccionados"
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <AppIcon name="check" size={24} color="black" />
+                  <AppIcon name="check" size={22} color={colors.danger} />
                 </TouchableOpacity>
               </View>
             );
@@ -182,6 +201,11 @@ export default function StackNavigator({
           name="DiagramaEmocional"
           component={DiagramaEmocional}
           options={{ title: 'Mis patrones' }}
+        />
+        <Stack.Screen
+          name="DetalleSueno"
+          component={DreamDetail}
+          options={{ title: 'Tu sueño' }}
         />
         <Stack.Screen
           name="Cuenta"
@@ -220,19 +244,21 @@ export default function StackNavigator({
           {props => (
             <Configuracion
               {...props}
+              user={user}
               enableNotifications={enableNotifications}
+              deleteAccount={deleteAccount}
             />
           )}
         </Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
 
-      <DropdownMenu
-        isVisible={Boolean(user) && menuVisible}
-        onClose={handleCloseMenu}
-        signOut={signOut}
-        user={user}
-      />
+      {Boolean(user) && ROOT_TAB_ROUTES.has(currentRoute) ? (
+        <BottomNavigation
+          activeRoute={currentRoute}
+          onNavigate={handleRootNavigation}
+        />
+      ) : null}
     </View>
   );
 }

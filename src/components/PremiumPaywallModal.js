@@ -10,6 +10,8 @@ import {
 import AppIcon from './AppIcon';
 import { navigationRef } from '../utils/navigationRef';
 import { trackProductEvent } from '../services/productAnalytics';
+import { openSubscriptionManagement } from '../services/subscriptionManagement';
+import { colors, radii } from '../theme/tokens';
 
 const ACCOUNT_REASONS = new Set([
   'account-required',
@@ -25,6 +27,13 @@ const getPackageTitle = (purchasePackage) =>
 
 const getPackagePrice = (purchasePackage) =>
   purchasePackage?.product?.priceString || '';
+
+const getPackagePeriod = (purchasePackage) => {
+  const identifier = purchasePackage?.identifier || '';
+  if (identifier.includes('annual')) return '/ año';
+  if (identifier.includes('monthly')) return '/ mes';
+  return '';
+};
 
 const getAccountCopy = (reason, remainingAfterAccount) => {
   if (reason === 'guest-follow-up') {
@@ -132,7 +141,7 @@ export default function PremiumPaywallModal({ subscription }) {
           <View style={styles.headerRow}>
             <View style={styles.headerIcon}>
               <AppIcon
-                name={needsAccount ? 'profile' : 'bookmark'}
+                name={needsAccount ? 'profile' : 'sparkles'}
                 size={22}
                 color="#111827"
               />
@@ -197,7 +206,7 @@ export default function PremiumPaywallModal({ subscription }) {
                           )}
                         </View>
                         <Text style={styles.packagePrice}>
-                          {getPackagePrice(item)}
+                          {getPackagePrice(item)} {getPackagePeriod(item)}
                         </Text>
                       </Pressable>
                     );
@@ -241,8 +250,17 @@ export default function PremiumPaywallModal({ subscription }) {
                 </Text>
               )}
               <Text style={styles.billingNote}>
-                El cobro, la renovación y la cancelación se gestionan desde tu tienda.
+                La suscripción se renueva automáticamente con el periodo indicado
+                hasta que la canceles. El cobro se gestiona desde tu tienda.
               </Text>
+              <Pressable
+                style={styles.secondaryButton}
+                onPress={() => openSubscriptionManagement().catch(() => null)}
+              >
+                <Text style={styles.secondaryButtonText}>
+                  Gestionar o cancelar suscripción
+                </Text>
+              </Pressable>
             </>
           )}
         </View>
@@ -259,9 +277,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: 22,
     paddingTop: 18,
     paddingBottom: 26,
@@ -275,8 +293,8 @@ const styles = StyleSheet.create({
   },
   headerIcon: {
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
     height: 42,
     justifyContent: 'center',
     width: 42,
@@ -288,12 +306,12 @@ const styles = StyleSheet.create({
     width: 36,
   },
   title: {
-    color: '#111827',
+    color: colors.ink,
     fontSize: 22,
     fontWeight: '800',
   },
   body: {
-    color: '#4B5563',
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
     marginTop: 8,
@@ -303,8 +321,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   benefitList: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
     gap: 6,
     marginTop: 16,
     padding: 14,
@@ -316,8 +334,9 @@ const styles = StyleSheet.create({
   },
   packageButton: {
     alignItems: 'center',
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.md,
     borderWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -326,8 +345,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   packageButtonSelected: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#4F46E5',
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   packageCopy: {
     flex: 1,
@@ -364,8 +383,8 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     justifyContent: 'center',
     marginTop: 18,
     minHeight: 48,
@@ -384,7 +403,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   secondaryButtonText: {
-    color: '#4F46E5',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '800',
   },

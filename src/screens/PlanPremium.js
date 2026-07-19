@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import AppIcon from '../components/AppIcon';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
+import { openSubscriptionManagement } from '../services/subscriptionManagement';
+import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
 
 const formatAvailability = (timestamp) => {
   if (!timestamp) return '';
@@ -152,6 +154,17 @@ export default function PlanPremium({ navigation }) {
         </TouchableOpacity>
       )}
 
+      {!subscription.isGuest && (
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => openSubscriptionManagement().catch(() => null)}
+        >
+          <Text style={styles.secondaryButtonText}>
+            Gestionar o cancelar suscripción
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {!subscription.configured && !subscription.isGuest && (
         <Text style={styles.warningText}>
           Las compras todavía no están disponibles en esta instalación.
@@ -176,37 +189,31 @@ export default function PlanPremium({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.background,
     flex: 1,
   },
   container: {
-    padding: 20,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.lg,
     paddingBottom: 42,
   },
   eyebrow: {
-    color: '#4338CA',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    ...typography.eyebrow,
+    color: colors.primary,
   },
   title: {
-    color: '#111827',
-    fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 34,
+    ...typography.title,
+    color: colors.ink,
     marginTop: 8,
   },
   subtitle: {
-    color: '#4B5563',
-    fontSize: 15,
-    lineHeight: 22,
+    ...typography.body,
+    color: colors.muted,
     marginTop: 10,
   },
   planCard: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.lg,
     marginTop: 24,
     padding: 20,
   },
@@ -216,41 +223,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   planLabel: {
-    color: '#6B7280',
+    color: '#AEB7C5',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   planName: {
-    color: '#111827',
+    color: colors.white,
     fontSize: 20,
     fontWeight: '800',
     marginTop: 2,
   },
   statusPill: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#303A4A',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   statusPillText: {
-    color: '#4338CA',
+    color: colors.lavender,
     fontSize: 11,
     fontWeight: '800',
   },
   usageValue: {
-    color: '#111827',
+    color: colors.white,
     fontSize: 34,
     fontWeight: '800',
     marginTop: 22,
   },
   usageLabel: {
-    color: '#4B5563',
+    color: '#C7CEDB',
     fontSize: 14,
     marginTop: 1,
   },
   usageHint: {
-    color: '#6B7280',
+    color: '#AEB7C5',
     fontSize: 12,
     marginTop: 8,
   },
@@ -260,16 +267,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   section: {
-    backgroundColor: '#fff',
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    borderWidth: 1,
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
     gap: 12,
     marginTop: 16,
     padding: 20,
   },
   sectionTitle: {
-    color: '#111827',
+    color: colors.ink,
     fontSize: 17,
     fontWeight: '800',
     marginBottom: 2,
@@ -280,7 +285,7 @@ const styles = StyleSheet.create({
   },
   benefitIcon: {
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primarySoft,
     borderRadius: 8,
     height: 28,
     justifyContent: 'center',

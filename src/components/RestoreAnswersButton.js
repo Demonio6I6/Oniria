@@ -9,8 +9,8 @@ export default function RestoreAnswersButton() {
 
   const handlePress = () => {
     Alert.alert(
-      'Restaurar respuestas',
-      '¿Desea restaurar todas las respuestas?',
+      'Borrar respuestas del contexto',
+      '¿Quieres borrar todas las respuestas de tu contexto?',
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Aceptar', onPress: () => clearRespuestas() }
@@ -19,8 +19,13 @@ export default function RestoreAnswersButton() {
   };
 
   return (
-    <TouchableOpacity onPress={handlePress} style={{ marginRight: 10, padding: 8 }}>
-      <AppIcon name="refresh" size={24} color="black" />
+    <TouchableOpacity
+      accessibilityLabel="Borrar respuestas del contexto"
+      accessibilityRole="button"
+      onPress={handlePress}
+      style={{ marginRight: 10, padding: 8 }}
+    >
+      <AppIcon name="eraser" size={22} color="black" />
     </TouchableOpacity>
   );
 }

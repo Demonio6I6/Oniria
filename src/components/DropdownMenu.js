@@ -142,7 +142,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
               style={styles.menuItem}
               onPress={() => handleNavigate('Cuenta')}
             >
-              <AppIcon name="check" size={20} />
+              <AppIcon name="personAdd" size={20} />
               <Text style={styles.menuText}>Crear cuenta</Text>
             </TouchableOpacity>
           ) : null}
@@ -175,7 +175,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('PlanPremium')}
           >
-            <AppIcon name="bookmark" size={20} />
+            <AppIcon name="sparkles" size={20} />
             <Text style={styles.menuText}>Plan y Premium</Text>
           </TouchableOpacity>
 

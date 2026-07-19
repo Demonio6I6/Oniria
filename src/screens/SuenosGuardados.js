@@ -1,59 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
   ActivityIndicator,
-  TouchableOpacity,
-  Modal,
   Alert,
   DeviceEventEmitter,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Markdown from 'react-native-markdown-display';
 import { Calendar } from 'react-native-calendars';
-import {
-  getDreamId,
-  getDreamInterpretation,
-  getDreamSummary,
-  getDreamTimestamp,
-} from '../domain/dreams';
+import AppIcon from '../components/AppIcon';
+import { getDreamId, getDreamSummary, getDreamTimestamp } from '../domain/dreams';
 import {
   deleteSavedDreamsByIds,
   getDreamCalendarData,
   loadSavedDreams,
 } from '../services/dreamRepository';
+import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
 
-const RESONANCE_LABELS = {
-  yes: 'Me resonó',
-  partial: 'Me resonó en parte',
-  no: 'No me representó',
+const getDayKey = timestamp => new Date(timestamp).toISOString().split('T')[0];
+
+const groupDreamsByDay = dreams => {
+  const groups = [];
+
+  dreams.forEach(dream => {
+    const key = getDayKey(getDreamTimestamp(dream));
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup?.key === key) {
+      lastGroup.dreams.push(dream);
+    } else {
+      groups.push({ key, date: new Date(getDreamTimestamp(dream)), dreams: [dream] });
+    }
+  });
+
+  return groups;
 };
 
 export default function SuenosGuardados({ navigation }) {
-  const [suenos, setSuenos] = useState([]);
+  const [dreams, setDreams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
   const [calendarMode, setCalendarMode] = useState(false);
-  const [selectedDream, setSelectedDream] = useState(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDreamIds, setSelectedDreamIds] = useState([]);
   const [markedDates, setMarkedDates] = useState({});
   const [dreamsByDate, setDreamsByDate] = useState({});
   const [dayDreamsModalVisible, setDayDreamsModalVisible] = useState(false);
   const [dreamsOfTheDay, setDreamsOfTheDay] = useState([]);
+  const groupedDreams = useMemo(() => groupDreamsByDay(dreams), [dreams]);
 
-  const setDreamState = (dreams) => {
-    setSuenos(dreams);
-    const calendarData = getDreamCalendarData(dreams);
-    setMarkedDates(calendarData.markedDates);
+  const setDreamState = nextDreams => {
+    setDreams(nextDreams);
+    const calendarData = getDreamCalendarData(nextDreams);
+    setMarkedDates(
+      Object.fromEntries(
+        Object.entries(calendarData.markedDates).map(([date, value]) => [
+          date,
+          { ...value, dotColor: colors.primary },
+        ])
+      )
+    );
     setDreamsByDate(calendarData.dreamsByDate);
   };
 
-  const loadSuenos = async () => {
+  const loadDreams = async () => {
     try {
-      const savedDreams = await loadSavedDreams();
-      setDreamState(savedDreams);
+      setDreamState(await loadSavedDreams());
     } catch (error) {
       console.error('Error al cargar los sueños guardados', error);
     } finally {
@@ -62,11 +76,8 @@ export default function SuenosGuardados({ navigation }) {
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      setLoading(true);
-      loadSuenos();
-    });
-
+    loadDreams();
+    const unsubscribe = navigation.addListener('focus', loadDreams);
     return unsubscribe;
   }, [navigation]);
 
@@ -77,9 +88,7 @@ export default function SuenosGuardados({ navigation }) {
   useEffect(() => {
     const enableListener = DeviceEventEmitter.addListener(
       'enableSelectionMode',
-      () => {
-        setSelectionMode(true);
-      }
+      () => setSelectionMode(true)
     );
     const cancelListener = DeviceEventEmitter.addListener(
       'cancelSelectionMode',
@@ -91,24 +100,22 @@ export default function SuenosGuardados({ navigation }) {
     const confirmListener = DeviceEventEmitter.addListener(
       'confirmDeletion',
       () => {
-        if (selectedDreamIds.length === 0) {
-          Alert.alert('No hay sueños seleccionados para borrar.');
+        if (!selectedDreamIds.length) {
+          Alert.alert('Selecciona al menos un sueño para borrarlo.');
           return;
         }
 
         Alert.alert(
-          'Confirmar borrado',
-          '¿Está seguro de que desea borrar los sueños seleccionados?',
+          'Borrar registros',
+          `Se ${selectedDreamIds.length === 1 ? 'borrará este sueño' : `borrarán ${selectedDreamIds.length} sueños`}. Esta acción no se puede deshacer.`,
           [
             { text: 'Cancelar', style: 'cancel' },
             {
-              text: 'Aceptar',
+              text: 'Borrar',
+              style: 'destructive',
               onPress: async () => {
                 try {
-                  const nextDreams = await deleteSavedDreamsByIds(
-                    selectedDreamIds
-                  );
-                  setDreamState(nextDreams);
+                  setDreamState(await deleteSavedDreamsByIds(selectedDreamIds));
                   setSelectionMode(false);
                   setSelectedDreamIds([]);
                 } catch (error) {
@@ -122,9 +129,7 @@ export default function SuenosGuardados({ navigation }) {
     );
     const calendarListener = DeviceEventEmitter.addListener(
       'toggleCalendarView',
-      () => {
-        setCalendarMode(prev => !prev);
-      }
+      () => setCalendarMode(current => !current)
     );
 
     return () => {
@@ -135,247 +140,204 @@ export default function SuenosGuardados({ navigation }) {
     };
   }, [selectedDreamIds]);
 
-  const handlePressDream = (dream) => {
+  const openDream = dream => {
     if (selectionMode) {
       const dreamId = getDreamId(dream);
-      if (selectedDreamIds.includes(dreamId)) {
-        setSelectedDreamIds(selectedDreamIds.filter(id => id !== dreamId));
-      } else {
-        setSelectedDreamIds([...selectedDreamIds, dreamId]);
-      }
+      setSelectedDreamIds(current =>
+        current.includes(dreamId)
+          ? current.filter(id => id !== dreamId)
+          : [...current, dreamId]
+      );
       return;
     }
 
-    setSelectedDream(dream);
-    setModalVisible(true);
+    navigation.navigate('DetalleSueno', { dreamId: getDreamId(dream) });
   };
 
-  const handleDayPress = (day) => {
-    const date = day.dateString;
-    if (!dreamsByDate[date]) return;
+  const handleDayPress = day => {
+    const dayDreams = dreamsByDate[day.dateString];
+    if (!dayDreams?.length) return;
 
-    const dreams = dreamsByDate[date];
-    if (dreams.length === 1) {
-      setSelectedDream(dreams[0]);
-      setModalVisible(true);
-    } else {
-      setDreamsOfTheDay(dreams);
-      setDayDreamsModalVisible(true);
+    if (dayDreams.length === 1) {
+      openDream(dayDreams[0]);
+      return;
     }
+
+    setDreamsOfTheDay(dayDreams);
+    setDayDreamsModalVisible(true);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Cargando sueños...</Text>
+        <ActivityIndicator size="small" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.outerContainer}>
-      {calendarMode ? (
-        <ScrollView contentContainerStyle={styles.container}>
-          <Calendar
-            onDayPress={handleDayPress}
-            markedDates={markedDates}
-            theme={{
-              calendarBackground: '#ffffff',
-              textSectionTitleColor: '#000',
-              todayTextColor: '#2e86de',
-              dayTextColor: '#000',
-              dotColor: '#2e86de',
-              arrowColor: 'black',
-              monthTextColor: 'black',
-              textMonthFontSize: 22,
-              textDayFontSize: 18,
-              textDayHeaderFontSize: 14,
-              textMonthFontWeight: 'bold',
-            }}
-            style={{
-              borderRadius: 12,
-              elevation: 3,
-              marginBottom: 20,
-              padding: 10,
-            }}
-          />
-          <Text style={{ textAlign: 'center', color: '#777' }}>
-            Toca un día marcado para ver el sueño guardado.
-          </Text>
-        </ScrollView>
-      ) : (
-        <ScrollView contentContainerStyle={styles.container}>
-          {suenos.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>Tu diario todavía está vacío.</Text>
-              <Text style={styles.emptyText}>
-                Empieza con una imagen, una emoción o cualquier detalle que aún
-                recuerdes.
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => navigation.navigate('NuevoSueno')}
-              >
-                <Text style={styles.emptyButtonText}>Registrar un sueño</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            suenos.map(sueno => {
-              const dreamId = getDreamId(sueno);
-              const isSelected = selectedDreamIds.includes(dreamId);
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.eyebrow}>TU HISTORIA, EN ORDEN</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Mi diario</Text>
+          <Text style={styles.count}>{dreams.length}</Text>
+        </View>
+        <Text style={styles.subtitle}>
+          Vuelve a tus sueños, asociaciones y reflexiones cuando lo necesites.
+        </Text>
 
-              return (
-                <TouchableOpacity
-                  key={dreamId}
-                  style={[
-                    styles.suenoContainer,
-                    selectionMode && isSelected && {
-                      backgroundColor: '#d6eaff',
-                    },
-                  ]}
-                  onPress={() => handlePressDream(sueno)}
-                >
-                  <Text style={styles.suenoSummary}>
-                    {getDreamSummary(sueno)}
-                  </Text>
-                  {!!sueno.wakingEmotion && (
-                    <Text style={styles.dreamMeta}>
-                      Al despertar: {sueno.wakingEmotion}
-                    </Text>
-                  )}
-                  {!!sueno.personalReflection && (
-                    <Text style={styles.reflectionPreview} numberOfLines={2}>
-                      Tu reflexión: {sueno.personalReflection}
-                    </Text>
-                  )}
-                  <Text style={styles.timestamp}>
-                    {new Date(getDreamTimestamp(sueno)).toLocaleString()}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      )}
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[styles.segment, !calendarMode && styles.segmentActive]}
+            onPress={() => setCalendarMode(false)}
+          >
+            <Text style={[styles.segmentText, !calendarMode && styles.segmentTextActive]}>
+              Lista
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segment, calendarMode && styles.segmentActive]}
+            onPress={() => setCalendarMode(true)}
+          >
+            <Text style={[styles.segmentText, calendarMode && styles.segmentTextActive]}>
+              Calendario
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {calendarMode ? (
+          <View style={styles.calendarSurface}>
+            <Calendar
+              onDayPress={handleDayPress}
+              markedDates={markedDates}
+              theme={{
+                calendarBackground: colors.surface,
+                textSectionTitleColor: colors.muted,
+                selectedDayBackgroundColor: colors.primary,
+                todayTextColor: colors.primary,
+                dayTextColor: colors.ink,
+                textDisabledColor: colors.line,
+                dotColor: colors.primary,
+                selectedDotColor: colors.white,
+                arrowColor: colors.primary,
+                monthTextColor: colors.ink,
+                textMonthFontSize: 18,
+                textDayFontSize: 14,
+                textDayHeaderFontSize: 12,
+                textMonthFontWeight: '800',
+              }}
+            />
+            <Text style={styles.calendarHint}>
+              Los puntos marcan los días con recuerdos guardados.
+            </Text>
+          </View>
+        ) : dreams.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <AppIcon name="moon" size={25} color={colors.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Todavía no hay recuerdos guardados.</Text>
+            <Text style={styles.emptyText}>
+              Empieza con una imagen, una emoción o cualquier detalle que aún recuerdes.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() => navigation.navigate('NuevoSueno')}
+            >
+              <Text style={styles.emptyButtonText}>Registrar mi primer sueño</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {groupedDreams.map(group => (
+              <View key={group.key} style={styles.dayGroup}>
+                <Text style={styles.dayLabel}>
+                  {group.date.toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                </Text>
+                {group.dreams.map(dream => {
+                  const id = getDreamId(dream);
+                  const selected = selectedDreamIds.includes(id);
+                  return (
+                    <TouchableOpacity
+                      key={id}
+                      style={[styles.dreamRow, selected && styles.dreamRowSelected]}
+                      onPress={() => openDream(dream)}
+                    >
+                      <View style={styles.dreamMarker}>
+                        {selectionMode ? (
+                          <View style={[styles.selectionCircle, selected && styles.selectionCircleActive]}>
+                            {selected ? <AppIcon name="check" size={14} color={colors.white} /> : null}
+                          </View>
+                        ) : (
+                          <View style={styles.emotionDot} />
+                        )}
+                      </View>
+                      <View style={styles.dreamCopy}>
+                        <Text style={styles.dreamTitle} numberOfLines={2}>
+                          {getDreamSummary(dream)}
+                        </Text>
+                        <View style={styles.metaRow}>
+                          {dream.wakingEmotion ? (
+                            <Text style={styles.dreamMeta}>{dream.wakingEmotion}</Text>
+                          ) : null}
+                          {dream.personalReflection ? (
+                            <Text style={styles.reflectionMeta}>Con reflexión</Text>
+                          ) : null}
+                          {!dream.fullInterpretation && !dream.interpretation ? (
+                            <Text style={styles.manualMeta}>Sin IA</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                      {!selectionMode ? (
+                        <AppIcon name="arrowRight" size={17} color={colors.subtle} />
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       <Modal
         visible={dayDreamsModalVisible}
         animationType="slide"
-        transparent={true}
+        transparent
         onRequestClose={() => setDayDreamsModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Sueños guardados ese día:</Text>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Sueños de este día</Text>
             {dreamsOfTheDay.map(dream => (
               <TouchableOpacity
                 key={getDreamId(dream)}
-                style={styles.modalOption}
+                style={styles.modalRow}
                 onPress={() => {
-                  setSelectedDream(dream);
                   setDayDreamsModalVisible(false);
-                  setModalVisible(true);
+                  navigation.navigate('DetalleSueno', { dreamId: getDreamId(dream) });
                 }}
               >
-                <Text>{getDreamSummary(dream)}</Text>
+                <Text style={styles.modalRowText} numberOfLines={2}>
+                  {getDreamSummary(dream)}
+                </Text>
+                <AppIcon name="arrowRight" size={17} color={colors.muted} />
               </TouchableOpacity>
             ))}
-            <TouchableOpacity onPress={() => setDayDreamsModalVisible(false)}>
-              <Text style={styles.closeButton}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={modalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <ScrollView contentContainerStyle={styles.modalContent}>
-              {selectedDream && (
-                <>
-                  <Text style={styles.modalEyebrow}>TU SUEÑO</Text>
-                  <Text style={styles.dreamDescription}>
-                    {selectedDream.description || getDreamSummary(selectedDream)}
-                  </Text>
-
-                  {!!selectedDream.wakingEmotion && (
-                    <Text style={styles.detailMeta}>
-                      Emoción al despertar: {selectedDream.wakingEmotion}
-                    </Text>
-                  )}
-                  {!!selectedDream.wakingContext && (
-                    <View style={styles.personalSection}>
-                      <Text style={styles.personalSectionTitle}>
-                        Asociación con tu vida
-                      </Text>
-                      <Text style={styles.personalSectionText}>
-                        {selectedDream.wakingContext}
-                      </Text>
-                    </View>
-                  )}
-
-                  {getDreamInterpretation(selectedDream) ? (
-                    <>
-                      <Text style={[styles.modalTitle, styles.readingTitle]}>
-                        Lectura orientativa
-                      </Text>
-                      <Markdown>{getDreamInterpretation(selectedDream)}</Markdown>
-                    </>
-                  ) : (
-                    <View style={styles.manualDreamNotice}>
-                      <Text style={styles.manualDreamNoticeTitle}>
-                        Guardado sin lectura de IA
-                      </Text>
-                      <Text style={styles.manualDreamNoticeText}>
-                        Este registro forma parte de tu diario y de tus recuentos,
-                        pero no consumió una interpretación.
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.manualDreamAction}
-                        onPress={() => {
-                          setModalVisible(false);
-                          navigation.navigate('NuevoSueno', {
-                            manualDream: selectedDream,
-                          });
-                        }}
-                      >
-                        <Text style={styles.manualDreamActionText}>
-                          Interpretar este sueño
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {(selectedDream.personalReflection || selectedDream.resonance) ? (
-                    <View style={styles.reflectionSection}>
-                      <Text style={styles.personalSectionTitle}>Tu reflexión</Text>
-                      {!!selectedDream.resonance && (
-                        <Text style={styles.resonanceLabel}>
-                          {RESONANCE_LABELS[selectedDream.resonance] ||
-                            selectedDream.resonance}
-                        </Text>
-                      )}
-                      {!!selectedDream.personalReflection && (
-                        <Text style={styles.personalSectionText}>
-                          {selectedDream.personalReflection}
-                        </Text>
-                      )}
-                    </View>
-                  ) : null}
-                </>
-              )}
-            </ScrollView>
             <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={styles.closeButtonContainer}
+              style={styles.closeButton}
+              onPress={() => setDayDreamsModalVisible(false)}
             >
-              <Text style={styles.closeButton}>Cerrar</Text>
+              <Text style={styles.closeButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -385,200 +347,215 @@ export default function SuenosGuardados({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  screen: { backgroundColor: colors.background, flex: 1 },
   container: {
-    padding: 20,
     flexGrow: 1,
+    paddingBottom: spacing.xxxl,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.lg,
   },
   loadingContainer: {
-    flex: 1,
     alignItems: 'center',
+    backgroundColor: colors.background,
+    flex: 1,
     justifyContent: 'center',
-    padding: 20,
   },
-  emptyState: {
-    alignItems: 'flex-start',
-    backgroundColor: '#F8FAFC',
-    borderColor: '#CBD5E1',
-    borderRadius: 14,
-    borderStyle: 'dashed',
+  eyebrow: { ...typography.eyebrow, color: colors.primary },
+  titleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+  },
+  title: { ...typography.title, color: colors.ink },
+  count: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.pill,
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: spacing.sm,
+    overflow: 'hidden',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  subtitle: { ...typography.body, color: colors.muted, marginTop: spacing.sm },
+  segmentedControl: {
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    marginTop: spacing.xxl,
+    padding: 4,
+  },
+  segment: {
+    alignItems: 'center',
+    borderRadius: 9,
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  segmentActive: { backgroundColor: colors.surface },
+  segmentText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  segmentTextActive: { color: colors.ink, fontWeight: '800' },
+  calendarSurface: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    padding: 20,
+    marginTop: spacing.lg,
+    overflow: 'hidden',
+    padding: spacing.sm,
   },
-  emptyTitle: {
-    color: '#111827',
-    fontSize: 19,
-    fontWeight: '800',
-  },
-  emptyText: {
-    color: '#64748B',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 7,
-  },
-  emptyButton: {
-    backgroundColor: '#111827',
-    borderRadius: 8,
-    marginTop: 16,
-    paddingHorizontal: 15,
-    paddingVertical: 11,
-  },
-  emptyButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  suenoContainer: {
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#f8f9fa',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  suenoSummary: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  dreamMeta: {
-    color: '#4338CA',
+  calendarHint: {
+    color: colors.muted,
     fontSize: 12,
-    marginTop: 7,
-    textTransform: 'capitalize',
-  },
-  reflectionPreview: {
-    color: '#475569',
-    fontSize: 13,
-    fontStyle: 'italic',
     lineHeight: 18,
-    marginTop: 7,
+    padding: spacing.md,
+    textAlign: 'center',
   },
-  timestamp: {
+  list: { marginTop: spacing.xxl },
+  dayGroup: { marginBottom: spacing.xxl },
+  dayLabel: {
+    color: colors.muted,
     fontSize: 12,
-    color: 'gray',
-    marginTop: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    maxHeight: '80%',
-    padding: 20,
-    elevation: 4,
-  },
-  modalContent: {
-    paddingBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  readingTitle: {
-    marginTop: 22,
-  },
-  manualDreamNotice: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    marginTop: 20,
-    padding: 14,
-  },
-  manualDreamNoticeTitle: {
-    color: '#111827',
-    fontSize: 14,
     fontWeight: '800',
-  },
-  manualDreamNoticeText: {
-    color: '#4B5563',
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
-  },
-  manualDreamAction: {
-    alignItems: 'center',
-    backgroundColor: '#111827',
-    borderRadius: 8,
-    marginTop: 12,
-    minHeight: 42,
-    justifyContent: 'center',
-    paddingHorizontal: 14,
-  },
-  manualDreamActionText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  modalEyebrow: {
-    color: '#6366F1',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  dreamDescription: {
-    color: '#111827',
-    fontSize: 16,
-    lineHeight: 23,
-  },
-  detailMeta: {
-    color: '#4338CA',
-    fontSize: 13,
-    marginTop: 10,
+    marginBottom: spacing.sm,
     textTransform: 'capitalize',
   },
-  personalSection: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    marginTop: 14,
-    padding: 13,
+  dreamRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    minHeight: 76,
+    paddingVertical: spacing.md,
   },
-  personalSectionTitle: {
-    color: '#111827',
-    fontSize: 14,
-    fontWeight: '800',
-    marginBottom: 5,
+  dreamRowSelected: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
   },
-  personalSectionText: {
-    color: '#475569',
-    fontSize: 14,
+  dreamMarker: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+    width: 24,
+  },
+  emotionDot: {
+    backgroundColor: colors.warm,
+    borderRadius: 6,
+    height: 10,
+    width: 10,
+  },
+  selectionCircle: {
+    borderColor: colors.subtle,
+    borderRadius: 11,
+    borderWidth: 1,
+    height: 22,
+    width: 22,
+  },
+  selectionCircleActive: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+  },
+  dreamCopy: { flex: 1, marginRight: spacing.sm },
+  dreamTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: '700',
     lineHeight: 21,
   },
-  reflectionSection: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 10,
-    marginTop: 20,
-    padding: 14,
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: 5,
   },
-  resonanceLabel: {
-    color: '#4338CA',
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 7,
-  },
-  modalOption: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: '#ddd',
-  },
-  closeButtonContainer: {
-    marginTop: 20,
+  dreamMeta: { color: colors.primary, fontSize: 11, fontWeight: '700' },
+  reflectionMeta: { color: colors.success, fontSize: 11, fontWeight: '700' },
+  manualMeta: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  emptyState: {
     alignItems: 'center',
+    marginTop: 54,
+    paddingHorizontal: spacing.xl,
+  },
+  emptyIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.primarySoft,
+    borderRadius: 25,
+    height: 50,
+    justifyContent: 'center',
+    width: 50,
+  },
+  emptyTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: spacing.lg,
+    textAlign: 'center',
+  },
+  emptyText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
+    marginTop: spacing.xl,
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  emptyButtonText: { color: colors.white, fontSize: 14, fontWeight: '800' },
+  modalOverlay: {
+    backgroundColor: 'rgba(16, 24, 39, 0.42)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 34,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.md,
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    backgroundColor: colors.line,
+    borderRadius: 3,
+    height: 5,
+    marginBottom: spacing.xl,
+    width: 42,
+  },
+  modalTitle: { ...typography.sectionTitle, color: colors.ink },
+  modalRow: {
+    alignItems: 'center',
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    minHeight: 64,
+  },
+  modalRowText: {
+    color: colors.ink,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+    marginRight: spacing.sm,
   },
   closeButton: {
-    color: '#007bff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    alignItems: 'center',
+    borderColor: colors.line,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    minHeight: 48,
   },
+  closeButtonText: { color: colors.ink, fontSize: 14, fontWeight: '800' },
 });

@@ -5,7 +5,7 @@ import { app } from '../firebase/config';
 import { getInstallationId } from './installationId';
 
 export const PREMIUM_ENTITLEMENT_ID =
-  process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'premium';
+  process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'Premium';
 
 const REGION = 'europe-west1';
 const functions = getFunctions(app, REGION);
@@ -24,11 +24,19 @@ let configuredAppUserId = null;
 
 const getPlatformApiKey = () => {
   if (Platform.OS === 'ios') {
-    return process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || '';
+    return (
+      process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ||
+      process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ||
+      ''
+    );
   }
 
   if (Platform.OS === 'android') {
-    return process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || '';
+    return (
+      process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY ||
+      process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ||
+      ''
+    );
   }
 
   return '';
@@ -93,6 +101,16 @@ export const purchaseRevenueCatPackage = async (purchasePackage) => {
 
 export const restoreRevenueCatPurchases = async () =>
   Purchases.restorePurchases();
+
+export const resetRevenueCatUser = async () => {
+  if (!configuredAppUserId) return;
+
+  try {
+    await Purchases.logOut();
+  } finally {
+    configuredAppUserId = null;
+  }
+};
 
 export const syncRevenueCatSubscription = async () => {
   const result = await syncSubscriptionCallable({});

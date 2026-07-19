@@ -17,11 +17,13 @@ import {
   UIManager,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Inicio from '../screens/Inicio';
 import { firebaseConfig } from '../firebase/config';
 import AppIcon from './AppIcon';
 import OnboardingScreen from './OnboardingScreen';
 import { trackProductEvent } from '../services/productAnalytics';
+import { colors, radii, spacing } from '../theme/tokens';
 
 const AUTH_METHODS = {
   EMAIL: 'email',
@@ -36,7 +38,7 @@ const ACTION_FEEDBACK_METHOD = {
   phoneConfirm: AUTH_METHODS.PHONE,
 };
 
-const AUTH_HERO_IMAGE = require('../../assets/2.png');
+const AUTH_HERO_IMAGE = require('../../assets/auth-hero-moon.jpg');
 const AUTH_MARK_IMAGE = require('../../assets/icon.png');
 const ONBOARDING_STORAGE_KEY = 'lunentra_onboarding_completed_v1';
 
@@ -348,7 +350,15 @@ export default function HomeScreen({
           imageStyle={styles.heroImage}
           resizeMode="cover"
         >
-          <View style={styles.heroScrim} />
+          <LinearGradient
+            colors={[
+              'rgba(5, 10, 22, 0.16)',
+              'rgba(5, 10, 22, 0.44)',
+              'rgba(5, 10, 22, 0.82)',
+            ]}
+            locations={[0, 0.52, 1]}
+            style={styles.heroScrim}
+          />
           <View style={styles.heroContent}>
             <View style={styles.brandRow}>
               <Image source={AUTH_MARK_IMAGE} style={styles.brandMark} />
@@ -649,28 +659,27 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   hero: {
-    minHeight: 300,
+    minHeight: 245,
     justifyContent: 'flex-end',
   },
   heroImage: {
-    opacity: 0.96,
+    opacity: 0.98,
   },
   heroScrim: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 10, 22, 0.42)',
   },
   heroContent: {
     alignSelf: 'center',
     maxWidth: 520,
     paddingHorizontal: 24,
-    paddingTop: 62,
-    paddingBottom: 42,
+    paddingBottom: 34,
+    paddingTop: 44,
     width: '100%',
   },
   brandRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginBottom: 22,
+    marginBottom: spacing.lg,
   },
   brandMark: {
     backgroundColor: '#fff',
@@ -686,7 +695,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#fff',
-    fontSize: 30,
+    fontSize: 27,
     fontWeight: '800',
     lineHeight: 36,
     maxWidth: 320,
@@ -699,9 +708,9 @@ const styles = StyleSheet.create({
     maxWidth: 330,
   },
   authPanel: {
-    backgroundColor: '#F8FAFC',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     flexGrow: 1,
     marginTop: -14,
     minHeight: 430,
@@ -718,27 +727,27 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: {
-    color: '#0F172A',
+    color: colors.ink,
     fontSize: 22,
     fontWeight: '800',
   },
   subtitle: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 4,
   },
   valueNote: {
     alignItems: 'flex-start',
-    backgroundColor: '#EEF2FF',
-    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
     flexDirection: 'row',
     gap: 9,
     marginBottom: 16,
     padding: 12,
   },
   valueNoteText: {
-    color: '#3730A3',
+    color: colors.primaryDark,
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
@@ -748,14 +757,14 @@ const styles = StyleSheet.create({
   },
   methodGroup: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: radii.md,
     overflow: 'hidden',
   },
   methodButton: {
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
+    borderColor: colors.line,
+    borderRadius: radii.md,
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 66,
@@ -763,8 +772,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   methodButtonActive: {
-    backgroundColor: '#4338CA',
-    borderColor: '#4338CA',
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
@@ -773,7 +782,7 @@ const styles = StyleSheet.create({
   },
   methodIcon: {
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primarySoft,
     borderRadius: 8,
     height: 38,
     justifyContent: 'center',
@@ -788,7 +797,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   methodTitle: {
-    color: '#0F172A',
+    color: colors.ink,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -796,7 +805,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   methodDescription: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 2,
@@ -806,22 +815,22 @@ const styles = StyleSheet.create({
   },
   expandedContent: {
     backgroundColor: '#fff',
-    borderBottomColor: '#E2E8F0',
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+    borderBottomColor: colors.line,
+    borderBottomLeftRadius: radii.md,
+    borderBottomRightRadius: radii.md,
     borderBottomWidth: 1,
-    borderLeftColor: '#E2E8F0',
+    borderLeftColor: colors.line,
     borderLeftWidth: 1,
-    borderRightColor: '#E2E8F0',
+    borderRightColor: colors.line,
     borderRightWidth: 1,
     padding: 14,
   },
   input: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: radii.md,
     borderWidth: 1,
-    color: '#0F172A',
+    color: colors.ink,
     fontSize: 15,
     minHeight: 48,
     marginBottom: 10,
@@ -834,8 +843,8 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     alignItems: 'center',
-    backgroundColor: '#4F46E5',
-    borderRadius: 8,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.md,
     flex: 1,
     justifyContent: 'center',
     minHeight: 46,
@@ -851,8 +860,8 @@ const styles = StyleSheet.create({
   outlineActionButton: {
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderColor: '#C7D2FE',
-    borderRadius: 8,
+    borderColor: colors.primary,
+    borderRadius: radii.md,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
@@ -861,7 +870,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   outlineActionButtonText: {
-    color: '#4338CA',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
@@ -872,7 +881,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   linkText: {
-    color: '#4338CA',
+    color: colors.primary,
     fontWeight: '700',
     textAlign: 'center',
   },

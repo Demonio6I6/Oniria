@@ -33,6 +33,9 @@ import {
   hasAcceptedMonthlyAnalysisPrivacyNotice,
 } from '../services/privacyRepository';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
+import AppIcon from '../components/AppIcon';
+import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { trackProductEvent } from '../services/productAnalytics';
 
 const MAX_DREAMS_PER_ANALYSIS = 45;
 const MIN_DREAMS_PER_MONTHLY_ANALYSIS = 10;
@@ -183,6 +186,7 @@ export default function DiagramaEmocional() {
   const [analisisMensual, setAnalisisMensual] = useState('');
   const [monthlyAnalysisRecord, setMonthlyAnalysisRecord] = useState(null);
   const [analizandoMensual, setAnalizandoMensual] = useState(false);
+  const [showAdvancedChart, setShowAdvancedChart] = useState(false);
   const chartSize = Math.max(
     RADAR_MIN_SIZE,
     Math.min(RADAR_MAX_SIZE, width - 56)
@@ -477,6 +481,10 @@ export default function DiagramaEmocional() {
 
       setMonthlyAnalysisRecord(analysisRecord);
       setAnalisisMensual(respuesta);
+      trackProductEvent('monthly_analysis_generated', {
+        dreamCount: suenosDelMes.length,
+        analyzedDreamCount: suenosParaAnalisis.length,
+      });
       saveMonthlyAnalysis(analysisRecord).catch(storageError => {
         console.error('Error guardando análisis mensual:', storageError);
       });
@@ -529,16 +537,35 @@ export default function DiagramaEmocional() {
         evidencia y decidir qué tiene sentido para ti.
       </Text>
 
-      {renderRadarChart()}
-      {renderEmotionBreakdown()}
-
-      {selectedEmocion ? getLecturaEmocion() : getLecturaGeneral()}
-
       <View style={styles.analysisSection}>
-        <Text style={styles.sectionTitle}>Lectura profunda del mes</Text>
-        <Text style={styles.analysisMeta}>
-          {`Sueños este mes: ${suenosMesActual.length}/${MIN_DREAMS_PER_MONTHLY_ANALYSIS}`}
-        </Text>
+        <View style={styles.analysisHeading}>
+          <View style={styles.analysisIcon}>
+            <AppIcon name="moon" size={21} color={colors.primary} />
+          </View>
+          <View style={styles.analysisHeadingCopy}>
+            <Text style={[styles.sectionTitle, styles.analysisTitle]}>
+              Lectura profunda del mes
+            </Text>
+            <Text style={styles.analysisMeta}>
+              {`${suenosMesActual.length}/${MIN_DREAMS_PER_MONTHLY_ANALYSIS} sueños registrados`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.monthProgressTrack}>
+          <View
+            style={[
+              styles.monthProgressFill,
+              {
+                width: `${Math.min(
+                  suenosMesActual.length / MIN_DREAMS_PER_MONTHLY_ANALYSIS,
+                  1
+                ) * 100}%`,
+              },
+            ]}
+          />
+        </View>
+
         {!hasMinimumMonthlyDreams && (
           <Text style={styles.analysisHint}>
             Guarda {suenosFaltantesAnalisis} sueños más este mes para activar
@@ -568,6 +595,9 @@ export default function DiagramaEmocional() {
           <Text style={styles.analysisButtonText}>
             {analizandoMensual ? 'Analizando...' : 'Explorar patrones del mes'}
           </Text>
+          {!analizandoMensual ? (
+            <AppIcon name="arrowRight" size={18} color={colors.white} />
+          ) : null}
         </TouchableOpacity>
 
         {analizandoMensual && (
@@ -591,168 +621,217 @@ export default function DiagramaEmocional() {
           </View>
         )}
       </View>
+
+      <View style={styles.patternSection}>
+        <View style={styles.patternHeading}>
+          <View style={styles.patternHeadingCopy}>
+            <Text style={styles.eyebrow}>SEÑALES EMOCIONALES</Text>
+            <Text style={styles.sectionTitle}>Lo que aparece con más frecuencia</Text>
+          </View>
+          <View style={styles.confidencePill}>
+            <Text style={styles.confidenceText}>
+              {cantidadSuenos < 5
+                ? 'INDICIO'
+                : cantidadSuenos < 10
+                  ? 'EN FORMACIÓN'
+                  : 'CONSISTENTE'}
+            </Text>
+          </View>
+        </View>
+
+        {selectedEmocion ? getLecturaEmocion() : getLecturaGeneral()}
+        {renderEmotionBreakdown()}
+      </View>
+
+      {data.length ? (
+        <View style={styles.advancedSection}>
+          <TouchableOpacity
+            style={styles.advancedToggle}
+            onPress={() => setShowAdvancedChart(current => !current)}
+          >
+            <View style={styles.advancedCopy}>
+              <Text style={styles.advancedTitle}>Vista avanzada</Text>
+              <Text style={styles.advancedText}>
+                Comparar todas las emociones en el radar
+              </Text>
+            </View>
+            <AppIcon
+              name={showAdvancedChart ? 'chevronUp' : 'chevronDown'}
+              size={19}
+              color={colors.muted}
+            />
+          </TouchableOpacity>
+          {showAdvancedChart ? renderRadarChart() : null}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: colors.background,
     flexGrow: 1,
+    paddingBottom: spacing.xxxl,
+    paddingHorizontal: screenPadding,
+    paddingTop: spacing.lg,
   },
-  eyebrow: {
-    color: '#6366F1',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 7,
-  },
-  title: {
-    color: '#111827',
-    fontSize: 27,
-    fontWeight: '800',
-    lineHeight: 33,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 21,
-    marginBottom: 20,
-    color: '#666',
-  },
-  chartSection: {
-    alignItems: 'center',
-    marginBottom: 18,
-  },
+  eyebrow: { ...typography.eyebrow, color: colors.primary },
+  title: { ...typography.title, color: colors.ink, marginTop: spacing.sm },
+  subtitle: { ...typography.body, color: colors.muted, marginTop: spacing.sm },
+  chartSection: { alignItems: 'center', marginTop: spacing.xl },
   chartNote: {
-    maxWidth: 320,
-    marginTop: 10,
-    fontSize: 13,
+    color: colors.muted,
+    fontSize: 12,
     lineHeight: 18,
-    color: '#666',
+    marginTop: spacing.sm,
+    maxWidth: 320,
     textAlign: 'center',
   },
-  breakdownSection: {
-    marginTop: 4,
-  },
+  breakdownSection: { marginTop: spacing.xl },
   emotionRow: {
-    borderWidth: 1,
-    borderColor: '#e8e8e8',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    backgroundColor: '#fff',
+    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
+    paddingVertical: spacing.md,
   },
   emotionRowSelected: {
-    borderColor: '#111',
-    backgroundColor: '#f6f6f6',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
   },
   emotionRowHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
-  emotionName: {
-    fontSize: 15,
-    color: '#222',
-    fontWeight: '600',
-  },
-  emotionPercent: {
-    fontSize: 15,
-    color: '#111',
-    fontWeight: '700',
-  },
+  emotionName: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  emotionPercent: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   emotionTrack: {
-    height: 6,
+    backgroundColor: colors.line,
     borderRadius: 3,
-    backgroundColor: '#ededed',
+    height: 6,
     overflow: 'hidden',
   },
   emotionFill: {
-    height: '100%',
+    backgroundColor: colors.primary,
     borderRadius: 3,
-    backgroundColor: '#111',
+    height: '100%',
   },
-  emotionEvidence: {
-    color: '#64748B',
-    fontSize: 11,
-    marginTop: 7,
-  },
+  emotionEvidence: { color: colors.muted, fontSize: 11, marginTop: 7 },
   detailBox: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 18,
-    padding: 15,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.md,
+    marginTop: spacing.lg,
+    padding: spacing.lg,
   },
-  detailLabel: {
-    color: '#6366F1',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.9,
-  },
+  detailLabel: { ...typography.eyebrow, color: colors.primary },
   detailText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#444',
-    textAlign: 'left',
+    color: colors.ink,
+    fontSize: 15,
     lineHeight: 22,
+    marginTop: spacing.sm,
   },
-  bold: {
-    fontWeight: 'bold',
-    color: '#000',
-  },
+  bold: { color: colors.ink, fontWeight: '800' },
   analysisSection: {
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    marginTop: 28,
-    paddingTop: 20,
+    backgroundColor: colors.midnight,
+    borderRadius: radii.lg,
+    marginTop: spacing.xxl,
+    padding: spacing.lg,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 6,
+  analysisHeading: { alignItems: 'center', flexDirection: 'row' },
+  analysisIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    height: 44,
+    justifyContent: 'center',
+    marginRight: spacing.md,
+    width: 44,
   },
-  analysisMeta: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+  analysisHeadingCopy: { flex: 1 },
+  sectionTitle: { ...typography.sectionTitle, color: colors.ink, marginTop: 5 },
+  analysisTitle: { color: colors.white, marginTop: 0 },
+  analysisMeta: { color: '#BCC4D2', fontSize: 12, marginTop: 3 },
+  monthProgressTrack: {
+    backgroundColor: '#303A4A',
+    borderRadius: radii.pill,
+    height: 7,
+    marginTop: spacing.lg,
+    overflow: 'hidden',
+  },
+  monthProgressFill: {
+    backgroundColor: colors.lavender,
+    borderRadius: radii.pill,
+    height: '100%',
   },
   analysisHint: {
-    color: '#666',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
+    color: '#D0D5DD',
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: spacing.md,
   },
   analysisButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#000',
-    borderRadius: 24,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    minHeight: 48,
   },
-  analysisButtonDisabled: {
-    backgroundColor: '#999',
-  },
+  analysisButtonDisabled: { opacity: 0.42 },
   analysisButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+    marginRight: spacing.sm,
   },
-  analysisLoader: {
-    marginTop: 16,
-    alignSelf: 'flex-start',
-  },
+  analysisLoader: { alignSelf: 'center', marginTop: spacing.lg },
   analysisResult: {
-    marginTop: 18,
+    backgroundColor: colors.white,
+    borderRadius: radii.md,
+    marginTop: spacing.lg,
+    padding: spacing.lg,
   },
   analysisResultMeta: {
-    color: '#666',
-    fontSize: 13,
-    marginBottom: 10,
+    color: colors.muted,
+    fontSize: 12,
+    marginBottom: spacing.md,
   },
+  patternSection: {
+    borderTopColor: colors.line,
+    borderTopWidth: 1,
+    marginTop: spacing.xxxl,
+    paddingTop: spacing.xxxl,
+  },
+  patternHeading: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  patternHeadingCopy: { flex: 1 },
+  confidencePill: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radii.pill,
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+  },
+  confidenceText: { color: colors.success, fontSize: 9, fontWeight: '800' },
+  advancedSection: {
+    borderTopColor: colors.line,
+    borderTopWidth: 1,
+    marginTop: spacing.xxxl,
+    paddingTop: spacing.lg,
+  },
+  advancedToggle: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 54,
+  },
+  advancedCopy: { flex: 1, marginRight: spacing.sm },
+  advancedTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  advancedText: { color: colors.muted, fontSize: 11, marginTop: 3 },
 });

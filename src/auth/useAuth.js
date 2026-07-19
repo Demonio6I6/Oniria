@@ -27,9 +27,14 @@ import {
   migrateUserLocalDataById,
 } from '../services/userStorage';
 import { migrateAnonymousServerState } from '../services/anonymousAccountMigration';
+import { deleteRemoteUserAccount } from '../services/accountDeletion';
+import { resetRevenueCatUser } from '../services/subscriptionService';
+
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '';
 
 GoogleSignin.configure({
-  webClientId: '713716281775-h6bc1cec3i5plmkn8bsmlicg3mm0a4u2.apps.googleusercontent.com',
+  webClientId: GOOGLE_WEB_CLIENT_ID,
 });
 
 const LINK_CONFLICT_ERROR_CODES = new Set([
@@ -154,6 +159,12 @@ export function useAuth() {
 
   const signInWithGoogle = async () => {
     try {
+      if (!GOOGLE_WEB_CLIENT_ID) {
+        throw new Error(
+          'Google Sign-In no esta configurado para este entorno.'
+        );
+      }
+
       await GoogleSignin.signOut().catch(() => null);
 
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -292,6 +303,10 @@ export function useAuth() {
         await clearUserLocalDataById(anonymousUid);
       }
 
+      await resetRevenueCatUser().catch(error => {
+        console.warn('No se pudo cerrar la identidad de RevenueCat:', error);
+      });
+
       await clearCurrentSession();
       setPhoneVerificationId(null);
       console.log('Usuario cerro sesion correctamente');
@@ -303,6 +318,34 @@ export function useAuth() {
         setPhoneVerificationId(null);
       }
 
+      throw error;
+    }
+  };
+
+  const deleteAccount = async () => {
+    const currentUser = auth.currentUser;
+    const uid = currentUser?.uid || '';
+    let remoteAccountDeleted = false;
+
+    if (!uid) {
+      throw new Error('No hay una cuenta activa que eliminar.');
+    }
+
+    try {
+      await deleteRemoteUserAccount();
+      remoteAccountDeleted = true;
+      await resetRevenueCatUser().catch(error => {
+        console.warn('No se pudo cerrar la identidad de RevenueCat:', error);
+      });
+      await clearUserLocalDataById(uid);
+      await clearCurrentSession();
+      setPhoneVerificationId(null);
+      return true;
+    } catch (error) {
+      if (remoteAccountDeleted) {
+        await clearCurrentSession();
+        setPhoneVerificationId(null);
+      }
       throw error;
     }
   };
@@ -334,6 +377,7 @@ export function useAuth() {
     setModalVisible,
     notificationMessage,
     enableNotifications,
+    deleteAccount,
     signOut: signOutUser,
   };
 }

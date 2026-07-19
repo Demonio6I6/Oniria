@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Lunentra",
-    "slug": "lunentra",
+    "slug": "oniria",
     "version": "1.0.0",
     "scheme": "lunentra",
     "orientation": "portrait",
@@ -25,8 +25,15 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.nicarao.lunentra",
+      "versionCode": 1,
       "jsEngine": "hermes",
-      "googleServicesFile": "./assets/google-services.json"
+      "googleServicesFile": "./assets/google-services.json",
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,6 +52,16 @@
             "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf",
             "./node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf"
           ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
         }
       ]
     ],
