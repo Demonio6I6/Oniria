@@ -43,6 +43,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "credentialsSource": "local",
       "env": {
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDw8UnEfTp8emNxUFKy_D21DwzUeJaJ5hU",
         "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "post-it-72f0b.firebaseapp.com",

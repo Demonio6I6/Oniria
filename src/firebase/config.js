@@ -1,6 +1,7 @@
 // src/firebase/config.js
-import { initializeApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
+  getAuth,
   initializeAuth,
   getReactNativePersistence,
 } from 'firebase/auth';
@@ -18,15 +19,25 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Inicializar Firebase
-const app = initializeApp(firebaseConfig);
+// Reutilizar la app por defecto durante Fast Refresh.
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // Inicializar Auth con persistencia en AsyncStorage
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+let auth;
+
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch (error) {
+  if (error?.code !== 'auth/already-initialized') {
+    throw error;
+  }
+
+  auth = getAuth(app);
+}
 
 // Inicializar Firestore
-const db = getFirestore();
+const db = getFirestore(app);
 
 export { app, auth, db, firebaseConfig };

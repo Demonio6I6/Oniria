@@ -81,6 +81,7 @@ async function createTextResponse(apiKey, {
   input,
   maxOutputTokens,
   reasoningEffort,
+  onUsage,
 }) {
   assertApiKey(apiKey);
 
@@ -110,6 +111,17 @@ async function createTextResponse(apiKey, {
       },
   );
 
+  if (typeof onUsage === "function") {
+    try {
+      await onUsage({
+        model,
+        usage: response.data?.usage || null,
+      });
+    } catch (error) {
+      console.error("No se pudo registrar el uso de OpenAI:", error);
+    }
+  }
+
   return extractResponseText(response.data);
 }
 
@@ -117,6 +129,7 @@ async function obtenerInterpretacionSueno(
     apiKey,
     descripcion,
     contextoPerfil = "",
+    onUsage,
 ) {
   return createTextResponse(apiKey, {
     model: MODEL_DEEP,
@@ -137,6 +150,7 @@ async function obtenerInterpretacionSueno(
       `que no es un diagnostico. Mantente en un maximo aproximado de ` +
       `650 palabras.`,
     maxOutputTokens: OUTPUT_LIMITS.dreamInterpretation,
+    onUsage,
   });
 }
 
@@ -145,6 +159,7 @@ async function obtenerRespuestaChat(
     mensajeUsuario,
     contextoPerfil = "",
     contextoConversacion = "",
+    onUsage,
 ) {
   const input = [
     "Esta es la unica ampliacion permitida dentro de la interpretacion " +
@@ -163,10 +178,15 @@ async function obtenerRespuestaChat(
     reasoningEffort: REASONING_LOW,
     input,
     maxOutputTokens: OUTPUT_LIMITS.dreamFollowUp,
+    onUsage,
   });
 }
 
-async function obtenerResumenInterpretacion(apiKey, interpretacionCompleta) {
+async function obtenerResumenInterpretacion(
+    apiKey,
+    interpretacionCompleta,
+    onUsage,
+) {
   const text = await createTextResponse(apiKey, {
     model: MODEL_FAST,
     reasoningEffort: REASONING_NONE,
@@ -178,6 +198,7 @@ async function obtenerResumenInterpretacion(apiKey, interpretacionCompleta) {
       "como un titulo atractivo y representativo:\n\n" +
       interpretacionCompleta,
     maxOutputTokens: OUTPUT_LIMITS.interpretationSummary,
+    onUsage,
   });
 
   return text.replace(/^["']|["']$/g, "").trim();
@@ -204,6 +225,7 @@ async function obtenerEmocionesDesdeContexto(
     apiKey,
     descripcion,
     contextoPerfil,
+    onUsage,
 ) {
   const prompt = `
 Usando la siguiente descripcion de un sueno y el contexto emocional del usuario,
@@ -228,6 +250,7 @@ ${descripcion}
       "valido.",
     input: prompt,
     maxOutputTokens: OUTPUT_LIMITS.dreamEmotions,
+    onUsage,
   });
 
   return parseJsonArray(respuesta)
@@ -236,7 +259,12 @@ ${descripcion}
       .slice(0, 5);
 }
 
-async function obtenerPatronEmocional(apiKey, suenos, periodo = "") {
+async function obtenerPatronEmocional(
+    apiKey,
+    suenos,
+    periodo = "",
+    onUsage,
+) {
   const prompt =
     "Analiza los siguientes registros de suenos y encuentra patrones " +
     "emocionales comunes. No lo presentes como diagnostico. Distingue entre " +
@@ -245,7 +273,8 @@ async function obtenerPatronEmocional(apiKey, suenos, periodo = "") {
     "resumen para que el usuario pueda revisar la evidencia. Da mas peso a " +
     "emociones, asociaciones y reflexiones confirmadas por el usuario que a " +
     "inferencias automaticas. No afirmes patrones de comportamiento si los " +
-    "registros solo permiten observar emociones o temas. Si los datos son pocos, dilo con " +
+    "registros solo permiten observar emociones o temas. Si los datos son " +
+    "pocos, dilo con " +
     "claridad y baja la confianza de la lectura. Mantente en un maximo " +
     "aproximado de 900 palabras.\n\n" +
     (periodo ? `Periodo analizado: ${periodo}\n\n` : "") +
@@ -256,10 +285,14 @@ async function obtenerPatronEmocional(apiKey, suenos, periodo = "") {
     reasoningEffort: REASONING_LOW,
     input: prompt,
     maxOutputTokens: OUTPUT_LIMITS.monthlyPattern,
+    onUsage,
   });
 }
 
-async function obtenerReflexionDiaria(apiKey) {
+async function obtenerReflexionDiaria(
+    apiKey,
+    onUsage,
+) {
   const prompt = `
 Genera un dato cientifico breve sobre la mente, los suenos, las emociones o la
 psicologia. Debe ser real, prudente, no clinico y en una sola oracion para una
@@ -274,6 +307,7 @@ notificacion.
       "Usa una sola oracion de maximo 24 palabras.",
     input: prompt,
     maxOutputTokens: OUTPUT_LIMITS.dailyReflection,
+    onUsage,
   });
 }
 

@@ -10,7 +10,6 @@ const {
   obtenerEmocionesDesdeContexto,
   obtenerInterpretacionSueno,
   obtenerPatronEmocional,
-  obtenerReflexionDiaria,
   obtenerRespuestaChat,
   obtenerResumenInterpretacion,
 } = require("./openai");
@@ -35,25 +34,54 @@ const REVENUECAT_ENTITLEMENT_ID =
 const PRODUCT_EVENT_NAMES = new Set([
   "account_conversion_completed",
   "account_cta_clicked",
+  "dream_interpretation_completed",
   "guest_demo_completed",
+  "home_primary_cta_clicked",
   "manual_dream_saved",
+  "monthly_analysis_generated",
   "paywall_dismissed",
   "paywall_shown",
   "purchase_failed",
   "purchase_started",
   "purchase_succeeded",
+  "reflection_saved",
   "restore_failed",
   "restore_started",
   "restore_succeeded",
 ]);
 const PRODUCT_EVENT_PROPERTY_NAMES = new Set([
   "accountType",
+  "analyzedDreamCount",
   "code",
+  "dreamCount",
   "method",
+  "monthlyDreams",
   "packageId",
   "reason",
+  "source",
+  "totalDreams",
 ]);
 const PRODUCT_EVENT_HOURLY_LIMIT = 120;
+const AI_CONTENT_REPORT_FEATURES = new Set([
+  "dream-follow-up",
+  "dream-interpretation",
+  "monthly-analysis",
+  "saved-dream-interpretation",
+]);
+const AI_CONTENT_REPORT_REASONS = new Set([
+  "harmful-or-offensive",
+  "misleading-or-inappropriate",
+]);
+const AI_CONTENT_REPORT_DAILY_LIMIT = 10;
+const DAILY_REFLECTION_MESSAGES = [
+  "Tómate un momento para observar cómo te sientes hoy.",
+  "Anota una imagen o emoción que aún recuerdes de esta noche.",
+  "Una pausa breve puede ayudarte a escuchar lo que necesitas hoy.",
+  "No necesitas entender cada sueño para aprender de lo que te hizo sentir.",
+  "Observa tus emociones con curiosidad, sin convertirlas en un diagnóstico.",
+  "Guarda solo aquello que te resulte útil y deja ir el resto.",
+  "Tu propia experiencia tiene más peso que cualquier interpretación.",
+];
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 const revenueCatRestApiKey = defineSecret("REVENUECAT_REST_API_KEY");
 const revenueCatWebhookAuth = defineSecret("REVENUECAT_WEBHOOK_AUTH");
@@ -233,6 +261,27 @@ async function deleteUserFirestoreTree(uid) {
   await admin.firestore().recursiveDelete(userRef);
 }
 
+async function deleteDocumentsByUid(collectionName, uid) {
+  const pageSize = 400;
+  let hasMore = true;
+
+  while (hasMore) {
+    const snapshot = await admin.firestore()
+        .collection(collectionName)
+        .where("uid", "==", uid)
+        .limit(pageSize)
+        .get();
+
+    if (snapshot.empty) return;
+
+    const batch = admin.firestore().batch();
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    hasMore = snapshot.size === pageSize;
+  }
+}
+
 async function deleteUserStorageFiles(uid) {
   const bucketName = getConfiguredStorageBucketName();
   let bucket;
@@ -266,6 +315,9 @@ async function deletePrivateUserState(uid) {
   const productEventRateRef = admin.firestore()
       .collection("privateProductEventRate")
       .doc(uid);
+  const aiContentReportRateRef = admin.firestore()
+      .collection("privateAiContentReportRate")
+      .doc(uid);
   const migrationsRef = admin.firestore()
       .collection("privateAnonymousMigrations");
   const [targetMigrations, sourceMigration] = await Promise.all([
@@ -286,6 +338,9 @@ async function deletePrivateUserState(uid) {
     getAiUsageRef(uid).delete(),
     getPrivateEntitlementRef(uid).delete(),
     admin.firestore().recursiveDelete(productEventRateRef),
+    admin.firestore().recursiveDelete(aiContentReportRateRef),
+    deleteDocumentsByUid("privateProductEvents", uid),
+    deleteDocumentsByUid("privateAiContentReports", uid),
     ...Array.from(migrationRefs.values()).map((ref) => ref.delete()),
   ]);
 }
@@ -391,6 +446,104 @@ function createPremiumRequiredError(message, feature) {
 function getCount(value) {
   const count = Number(value || 0);
   return Number.isFinite(count) ? count : 0;
+}
+
+function getOpenAiUsageMetrics(usage) {
+  const usageReported = usage && typeof usage === "object";
+  return {
+    cachedInputTokens: getCount(usage?.input_tokens_details?.cached_tokens),
+    callCount: 1,
+    inputTokens: getCount(usage?.input_tokens),
+    outputTokens: getCount(usage?.output_tokens),
+    reasoningTokens:
+      getCount(usage?.output_tokens_details?.reasoning_tokens),
+    totalTokens: getCount(usage?.total_tokens),
+    unreportedCallCount: usageReported ? 0 : 1,
+  };
+}
+
+function getOpenAiUsageIncrements(metrics) {
+  return Object.fromEntries(
+      Object.entries(metrics).map(([key, value]) => [
+        key,
+        admin.firestore.FieldValue.increment(value),
+      ]),
+  );
+}
+
+function getOpenAiDimensionKey(value) {
+  return String(value || "unknown")
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .slice(0, 80) || "unknown";
+}
+
+async function recordOpenAiUsage(uid, operation, responseUsage) {
+  const model = String(responseUsage?.model || "unknown").slice(0, 120);
+  const operationName = String(operation || "unknown").slice(0, 120);
+  const modelKey = getOpenAiDimensionKey(model);
+  const operationKey = getOpenAiDimensionKey(operationName);
+  const monthKey = getUtcMonthKey();
+  const metrics = getOpenAiUsageMetrics(responseUsage?.usage);
+  const totalIncrements = getOpenAiUsageIncrements(metrics);
+  const monthIncrements = getOpenAiUsageIncrements(metrics);
+  const modelIncrements = getOpenAiUsageIncrements(metrics);
+  const operationIncrements = getOpenAiUsageIncrements(metrics);
+  const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+  await getAiUsageRef(uid).set({
+    openAi: {
+      lastModel: model,
+      lastOperation: operationName,
+      lastRecordedAt: timestamp,
+      months: {
+        [monthKey]: {
+          ...monthIncrements,
+          lastModel: model,
+          lastOperation: operationName,
+          lastRecordedAt: timestamp,
+          models: {
+            [modelKey]: modelIncrements,
+          },
+          operations: {
+            [operationKey]: operationIncrements,
+          },
+        },
+      },
+      totals: totalIncrements,
+    },
+    updatedAt: timestamp,
+  }, {merge: true});
+}
+
+function createOpenAiUsageRecorder(uid, operation) {
+  return (responseUsage) => recordOpenAiUsage(uid, operation, responseUsage);
+}
+
+function mergeOpenAiUsageStats(sourceValue, targetValue) {
+  if (typeof sourceValue === "number" && typeof targetValue === "number") {
+    return sourceValue + targetValue;
+  }
+
+  const sourceIsPlainObject = sourceValue &&
+    Object.getPrototypeOf(sourceValue) === Object.prototype;
+  const targetIsPlainObject = targetValue &&
+    Object.getPrototypeOf(targetValue) === Object.prototype;
+
+  if (sourceIsPlainObject || targetIsPlainObject) {
+    const sourceObject = sourceIsPlainObject ? sourceValue : {};
+    const targetObject = targetIsPlainObject ? targetValue : {};
+    return Object.fromEntries(
+        Array.from(new Set([
+          ...Object.keys(sourceObject),
+          ...Object.keys(targetObject),
+        ])).map((key) => [
+          key,
+          mergeOpenAiUsageStats(sourceObject[key], targetObject[key]),
+        ]),
+    );
+  }
+
+  return targetValue ?? sourceValue;
 }
 
 function getUtcDayKey(millis = Date.now()) {
@@ -1379,6 +1532,78 @@ exports.trackProductEvent = onCall(
     },
 );
 
+exports.reportAiContent = onCall(
+    {
+      region: REGION,
+      timeoutSeconds: 15,
+    },
+    async (request) => {
+      requireAuth(request);
+      const data = request.data || {};
+      const content = readString(data, "content", {
+        required: true,
+        maxLength: 12000,
+      });
+      const feature = readString(data, "feature", {
+        required: true,
+        maxLength: 60,
+      });
+      const reason = readString(data, "reason", {
+        required: true,
+        maxLength: 60,
+      });
+
+      if (!AI_CONTENT_REPORT_FEATURES.has(feature) ||
+          !AI_CONTENT_REPORT_REASONS.has(reason)) {
+        throw new HttpsError(
+            "invalid-argument",
+            "El reporte no tiene un formato válido.",
+        );
+      }
+
+      const now = new Date();
+      const dayKey = now.toISOString().slice(0, 10);
+      const rateRef = admin.firestore()
+          .collection("privateAiContentReportRate")
+          .doc(request.auth.uid);
+      const reportRef = admin.firestore()
+          .collection("privateAiContentReports")
+          .doc();
+
+      await admin.firestore().runTransaction(async (transaction) => {
+        const rateSnapshot = await transaction.get(rateRef);
+        const rate = rateSnapshot.exists ? rateSnapshot.data() : {};
+        const reportCount = rate.dayKey === dayKey ?
+          getCount(rate.reportCount) :
+          0;
+
+        if (reportCount >= AI_CONTENT_REPORT_DAILY_LIMIT) {
+          createResourceExhaustedError(
+              "Se alcanzó el límite diario de reportes.",
+              {reason: "ai-content-report-rate-limit"},
+          );
+        }
+
+        transaction.set(rateRef, {
+          dayKey,
+          reportCount: reportCount + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, {merge: true});
+        transaction.set(reportRef, {
+          content,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          feature,
+          isAnonymous: isAnonymousAuthToken(request.auth.token),
+          reason,
+          status: "new",
+          uid: request.auth.uid,
+        });
+      });
+
+      return {reportId: reportRef.id, reported: true};
+    },
+);
+
 exports.migrateAnonymousServerState = onCall(
     {
       region: REGION,
@@ -1488,12 +1713,20 @@ exports.migrateAnonymousServerState = onCall(
             targetUsage.nextInterpretationAvailableAt,
         );
         const mergedNextAt = Math.max(sourceNextAt || 0, targetNextAt || 0);
+        const mergedOpenAiUsage = mergeOpenAiUsageStats(
+            sourceUsage.openAi,
+            targetUsage.openAi,
+        );
         const usageUpdate = {
           interpretationCount:
             getCount(sourceUsage.interpretationCount) +
             getCount(targetUsage.interpretationCount),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
+
+        if (mergedOpenAiUsage) {
+          usageUpdate.openAi = mergedOpenAiUsage;
+        }
 
         if (mergedNextAt) {
           usageUpdate.nextInterpretationAvailableAt = toTimestamp(mergedNextAt);
@@ -1692,6 +1925,7 @@ exports.interpretDream = aiFunction(async (data, apiKey, uid, authToken) => {
         apiKey,
         descripcion,
         contextoPerfil,
+        createOpenAiUsageRecorder(uid, "interpretDream"),
     );
 
     await completeDreamInterpretationQuota(
@@ -1750,6 +1984,7 @@ exports.continueDreamChat = aiFunction(async (data, apiKey, uid, authToken) => {
         mensajeUsuario,
         contextoPerfil,
         contextoConversacion,
+        createOpenAiUsageRecorder(uid, "continueDreamChat"),
     );
     return {text};
   } catch (error) {
@@ -1783,6 +2018,7 @@ exports.summarizeInterpretation = aiFunction(async (data, apiKey, uid) => {
     const text = await obtenerResumenInterpretacion(
         apiKey,
         interpretacionCompleta,
+        createOpenAiUsageRecorder(uid, "summarizeInterpretation"),
     );
     return {text};
   } catch (error) {
@@ -1820,6 +2056,7 @@ exports.extractDreamEmotions = aiFunction(async (data, apiKey, uid) => {
         apiKey,
         descripcion,
         contextoPerfil,
+        createOpenAiUsageRecorder(uid, "extractDreamEmotions"),
     );
     return {emociones};
   } catch (error) {
@@ -1854,7 +2091,12 @@ exports.findEmotionalPattern = aiFunction(async (
   const reservationId = await claimMonthlyEmotionalAnalysisQuota(uid);
 
   try {
-    const text = await obtenerPatronEmocional(apiKey, suenos, periodo);
+    const text = await obtenerPatronEmocional(
+        apiKey,
+        suenos,
+        periodo,
+        createOpenAiUsageRecorder(uid, "findEmotionalPattern"),
+    );
     await completeMonthlyEmotionalAnalysisQuota(
         uid,
         reservationId,
@@ -1902,18 +2144,12 @@ exports.dailyReflection = onSchedule(
       schedule: "every 24 hours",
       timeZone: "UTC",
       region: REGION,
-      secrets: [openaiApiKey],
     },
     async () => {
-      let reflectionMessage;
-
-      try {
-        reflectionMessage = await obtenerReflexionDiaria(openaiApiKey.value());
-      } catch (error) {
-        console.error("Error al obtener la reflexión:", error);
-        reflectionMessage =
-          "Tómate un momento para observar cómo te sientes hoy.";
-      }
+      const dayIndex = Math.floor(Date.now() / DAY_IN_MS);
+      const reflectionMessage = DAILY_REFLECTION_MESSAGES[
+          dayIndex % DAILY_REFLECTION_MESSAGES.length
+      ];
 
       try {
         const usersSnapshot = await admin.firestore()

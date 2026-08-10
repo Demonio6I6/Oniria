@@ -18,9 +18,6 @@ export default function App() {
     signInWithEmail,
     registerWithEmail,
     resetPassword,
-    sendPhoneVerificationCode,
-    confirmPhoneVerificationCode,
-    phoneVerificationId,
     signInAsGuest,
     signOut,
     modalVisible,
@@ -72,9 +69,6 @@ export default function App() {
             signInWithEmail={signInWithEmail}
             registerWithEmail={registerWithEmail}
             resetPassword={resetPassword}
-            sendPhoneVerificationCode={sendPhoneVerificationCode}
-            confirmPhoneVerificationCode={confirmPhoneVerificationCode}
-            phoneVerificationId={phoneVerificationId}
             signInAsGuest={signInAsGuest}
             signOut={signOut}
             showInfo={showInfo}

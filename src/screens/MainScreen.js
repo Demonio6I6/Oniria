@@ -21,6 +21,7 @@ import {
 } from '../../openai';
 import Markdown from 'react-native-markdown-display';
 import AppIcon from '../components/AppIcon';
+import ReportAiContentButton from '../components/ReportAiContentButton';
 import { GlobalContext } from '../GlobalContext';
 import {
   buildProfileContext,
@@ -878,6 +879,16 @@ export default function MainScreen({ navigation, route }) {
     return previousUserMessages === 0 ? 'Tu sueño' : 'Tu ampliación';
   };
 
+  const getAssistantMessageFeature = (messageIndex) => {
+    const previousAssistantMessages = messages
+      .slice(0, messageIndex)
+      .filter(message => message.role === 'assistant').length;
+
+    return previousAssistantMessages === 0
+      ? 'dream-interpretation'
+      : 'dream-follow-up';
+  };
+
   const renderDreamComposer = (variant) => {
     const isInitialComposer = variant === INTERACTION_STEPS.INITIAL;
     const minHeight = isInitialComposer ? 170 : 54;
@@ -1070,10 +1081,16 @@ export default function MainScreen({ navigation, route }) {
               ]}
             >
               {message.role === 'assistant' ? (
-                <AssistantMessage
-                  text={message.text}
-                  markdownStyle={markdownStyle}
-                />
+                <>
+                  <AssistantMessage
+                    text={message.text}
+                    markdownStyle={markdownStyle}
+                  />
+                  <ReportAiContentButton
+                    content={message.text}
+                    feature={getAssistantMessageFeature(index)}
+                  />
+                </>
               ) : (
                 <>
                   <Text style={styles.userMessageLabel}>

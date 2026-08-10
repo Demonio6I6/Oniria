@@ -34,6 +34,7 @@ import {
 } from '../services/privacyRepository';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
 import AppIcon from '../components/AppIcon';
+import ReportAiContentButton from '../components/ReportAiContentButton';
 import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
 import { trackProductEvent } from '../services/productAnalytics';
 
@@ -618,6 +619,10 @@ export default function DiagramaEmocional() {
               </Text>
             )}
             <Markdown>{analisisMensual}</Markdown>
+            <ReportAiContentButton
+              content={analisisMensual}
+              feature="monthly-analysis"
+            />
           </View>
         )}
       </View>

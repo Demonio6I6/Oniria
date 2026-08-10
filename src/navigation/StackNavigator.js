@@ -30,9 +30,6 @@ export default function StackNavigator({
   signInWithEmail,
   registerWithEmail,
   resetPassword,
-  sendPhoneVerificationCode,
-  confirmPhoneVerificationCode,
-  phoneVerificationId,
   signInAsGuest,
   signOut,
   showInfo,
@@ -92,9 +89,6 @@ export default function StackNavigator({
               signInWithEmail={signInWithEmail}
               registerWithEmail={registerWithEmail}
               resetPassword={resetPassword}
-              sendPhoneVerificationCode={sendPhoneVerificationCode}
-              confirmPhoneVerificationCode={confirmPhoneVerificationCode}
-              phoneVerificationId={phoneVerificationId}
               signInAsGuest={signInAsGuest}
             />
           )}
@@ -219,9 +213,6 @@ export default function StackNavigator({
               signInWithEmail={signInWithEmail}
               registerWithEmail={registerWithEmail}
               resetPassword={resetPassword}
-              sendPhoneVerificationCode={sendPhoneVerificationCode}
-              confirmPhoneVerificationCode={confirmPhoneVerificationCode}
-              phoneVerificationId={phoneVerificationId}
               signInAsGuest={signInAsGuest}
               forceAuthOptions
               allowGuest={false}

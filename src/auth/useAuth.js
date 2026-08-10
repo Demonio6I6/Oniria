@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
-  PhoneAuthProvider,
   createUserWithEmailAndPassword,
   linkWithCredential,
   onAuthStateChanged,
@@ -49,7 +48,6 @@ export function useAuth() {
   const [pushToken, setPushToken] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
-  const [phoneVerificationId, setPhoneVerificationId] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -240,45 +238,6 @@ export function useAuth() {
     }
   };
 
-  const sendPhoneVerificationCode = async (phoneNumber, appVerifier) => {
-    try {
-      if (!appVerifier) {
-        throw new Error('No se encontro el verificador reCAPTCHA.');
-      }
-
-      const provider = new PhoneAuthProvider(auth);
-      const verificationId = await provider.verifyPhoneNumber(phoneNumber.trim(), appVerifier);
-      setPhoneVerificationId(verificationId);
-      return verificationId;
-    } catch (error) {
-      console.error('Error al enviar SMS de autenticacion:', error);
-      throw error;
-    }
-  };
-
-  const confirmPhoneVerificationCode = async (verificationCode) => {
-    try {
-      if (!phoneVerificationId) {
-        throw new Error('Primero solicita el codigo SMS.');
-      }
-
-      const credential = PhoneAuthProvider.credential(
-        phoneVerificationId,
-        verificationCode.trim()
-      );
-
-      const user = await linkAnonymousAccount(
-        credential,
-        () => signInWithCredential(auth, credential)
-      );
-      setPhoneVerificationId(null);
-      return user;
-    } catch (error) {
-      console.error('Error al confirmar codigo de telefono:', error);
-      throw error;
-    }
-  };
-
   const signInAsGuest = async () => {
     try {
       await clearCurrentSession();
@@ -308,14 +267,12 @@ export function useAuth() {
       });
 
       await clearCurrentSession();
-      setPhoneVerificationId(null);
       console.log('Usuario cerro sesion correctamente');
     } catch (error) {
       console.error('Error al cerrar sesion:', error);
 
       if (remoteAnonymousCleanupDone) {
         await clearCurrentSession();
-        setPhoneVerificationId(null);
       }
 
       throw error;
@@ -339,12 +296,10 @@ export function useAuth() {
       });
       await clearUserLocalDataById(uid);
       await clearCurrentSession();
-      setPhoneVerificationId(null);
       return true;
     } catch (error) {
       if (remoteAccountDeleted) {
         await clearCurrentSession();
-        setPhoneVerificationId(null);
       }
       throw error;
     }
@@ -369,9 +324,6 @@ export function useAuth() {
     signInWithEmail,
     registerWithEmail,
     resetPassword,
-    sendPhoneVerificationCode,
-    confirmPhoneVerificationCode,
-    phoneVerificationId,
     signInAsGuest,
     modalVisible,
     setModalVisible,

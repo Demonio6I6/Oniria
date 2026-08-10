@@ -1,5 +1,5 @@
 // src/components/HomeScreen.js
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
@@ -19,7 +19,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Inicio from '../screens/Inicio';
-import { firebaseConfig } from '../firebase/config';
 import AppIcon from './AppIcon';
 import OnboardingScreen from './OnboardingScreen';
 import { trackProductEvent } from '../services/productAnalytics';
@@ -27,15 +26,12 @@ import { colors, radii, spacing } from '../theme/tokens';
 
 const AUTH_METHODS = {
   EMAIL: 'email',
-  PHONE: 'phone',
 };
 
 const ACTION_FEEDBACK_METHOD = {
   emailSignIn: AUTH_METHODS.EMAIL,
   emailRegister: AUTH_METHODS.EMAIL,
   resetPassword: AUTH_METHODS.EMAIL,
-  phoneSend: AUTH_METHODS.PHONE,
-  phoneConfirm: AUTH_METHODS.PHONE,
 };
 
 const AUTH_HERO_IMAGE = require('../../assets/auth-hero-moon.jpg');
@@ -52,8 +48,6 @@ if (
 const ERROR_MESSAGES = {
   'auth/email-already-in-use': 'Ese correo ya tiene una cuenta.',
   'auth/invalid-email': 'El correo no es valido.',
-  'auth/invalid-phone-number': 'El telefono debe estar en formato internacional, por ejemplo +34600111222.',
-  'auth/invalid-verification-code': 'El codigo SMS no es valido.',
   'auth/missing-password': 'Escribe una contrasena.',
   'auth/operation-not-allowed': 'Activa este proveedor en Firebase Authentication.',
   'auth/user-not-found': 'No existe una cuenta con ese correo.',
@@ -65,27 +59,12 @@ function getAuthErrorMessage(error) {
   return ERROR_MESSAGES[error?.code] || error?.message || 'No se pudo completar la autenticacion.';
 }
 
-function PhoneRecaptchaVerifier({ verifierRef, config }) {
-  const { FirebaseRecaptchaVerifierModal } = require('expo-firebase-recaptcha');
-
-  return (
-    <FirebaseRecaptchaVerifierModal
-      ref={verifierRef}
-      firebaseConfig={config}
-      attemptInvisibleVerification
-      cancelLabel="Cancelar"
-      title="Verificacion"
-    />
-  );
-}
-
 function AuthMethodIcon({ type, active }) {
   const iconColor = active ? '#fff' : '#4F46E5';
 
   const iconNameByType = {
     google: 'google',
     email: 'email',
-    phone: 'phone',
     guest: 'guest',
   };
 
@@ -182,9 +161,6 @@ export default function HomeScreen({
   signInWithEmail,
   registerWithEmail,
   resetPassword,
-  sendPhoneVerificationCode,
-  confirmPhoneVerificationCode,
-  phoneVerificationId,
   signInAsGuest,
   forceAuthOptions = false,
   allowGuest = true,
@@ -193,27 +169,17 @@ export default function HomeScreen({
   heroTitle = 'Conócete a través de lo que sueñas.',
   heroText = 'Registra tus sueños, explora posibles significados y reconoce patrones con el tiempo.',
 }) {
-  const recaptchaVerifier = useRef(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [smsCode, setSmsCode] = useState('');
   const [busyAction, setBusyAction] = useState(null);
   const [message, setMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [shouldRenderRecaptcha, setShouldRenderRecaptcha] = useState(false);
   const [activeMethod, setActiveMethod] = useState(null);
   const [feedbackMethod, setFeedbackMethod] = useState(null);
   const [onboardingLoading, setOnboardingLoading] = useState(!forceAuthOptions);
   const [onboardingCompleted, setOnboardingCompleted] = useState(
     forceAuthOptions
   );
-
-  useEffect(() => {
-    if (phoneVerificationId) {
-      setActiveMethod(AUTH_METHODS.PHONE);
-    }
-  }, [phoneVerificationId]);
 
   useEffect(() => {
     let isActive = true;
@@ -306,8 +272,6 @@ export default function HomeScreen({
   };
 
   const hasEmailCredentials = email.trim() && password;
-  const hasPhoneNumber = phoneNumber.trim();
-  const hasSmsCode = smsCode.trim();
   const isBusy = Boolean(busyAction);
 
   const toggleAuthMethod = (method) => {
@@ -322,23 +286,11 @@ export default function HomeScreen({
     );
   };
 
-  const getRecaptchaVerifier = async () => {
-    setShouldRenderRecaptcha(true);
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
-    });
-    return recaptchaVerifier.current;
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {shouldRenderRecaptcha ? (
-        <PhoneRecaptchaVerifier verifierRef={recaptchaVerifier} config={firebaseConfig} />
-      ) : null}
-
       <ScrollView
         keyboardShouldPersistTaps="handled"
         style={styles.scrollView}
@@ -491,125 +443,6 @@ export default function HomeScreen({
                       )}
                     </Pressable>
                     {feedbackMethod === AUTH_METHODS.EMAIL ? (
-                      <AuthFeedback
-                        message={message}
-                        errorMessage={errorMessage}
-                      />
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.methodGroup}>
-                <AuthMethodButton
-                  type="phone"
-                  title="Telefono"
-                  description="Codigo SMS con verificacion"
-                  active={activeMethod === AUTH_METHODS.PHONE}
-                  disabled={isBusy}
-                  expandable
-                  onPress={() => toggleAuthMethod(AUTH_METHODS.PHONE)}
-                />
-                {activeMethod === AUTH_METHODS.PHONE ? (
-                  <View style={styles.expandedContent}>
-                    <TextInput
-                      value={phoneNumber}
-                      onChangeText={setPhoneNumber}
-                      onFocus={() => setShouldRenderRecaptcha(true)}
-                      autoCapitalize="none"
-                      keyboardType="phone-pad"
-                      placeholder="+34600111222"
-                      placeholderTextColor="#94A3B8"
-                      style={styles.input}
-                    />
-                    {phoneVerificationId ? (
-                      <>
-                        <TextInput
-                          value={smsCode}
-                          onChangeText={setSmsCode}
-                          keyboardType="number-pad"
-                          placeholder="Codigo SMS"
-                          placeholderTextColor="#94A3B8"
-                          style={styles.input}
-                        />
-                        <View style={styles.row}>
-                          <Pressable
-                            style={[
-                              styles.actionButton,
-                              (!hasSmsCode || isBusy) && styles.disabledButton,
-                            ]}
-                            disabled={!hasSmsCode || isBusy}
-                            onPress={() =>
-                              runAuthAction('phoneConfirm', () =>
-                                confirmPhoneVerificationCode(smsCode)
-                              )
-                            }
-                          >
-                            {busyAction === 'phoneConfirm' ? (
-                              <ActivityIndicator color="#fff" size="small" />
-                            ) : (
-                              <Text style={styles.actionButtonText}>
-                                Confirmar
-                              </Text>
-                            )}
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.outlineActionButton,
-                              isBusy && styles.disabledButton,
-                            ]}
-                            disabled={isBusy}
-                            onPress={() =>
-                              runAuthAction(
-                                'phoneSend',
-                                async () =>
-                                  sendPhoneVerificationCode(
-                                    phoneNumber,
-                                    await getRecaptchaVerifier()
-                                  ),
-                                'Codigo SMS enviado.'
-                              )
-                            }
-                          >
-                            {busyAction === 'phoneSend' ? (
-                              <ActivityIndicator color="#4F46E5" size="small" />
-                            ) : (
-                              <Text style={styles.outlineActionButtonText}>
-                                Reenviar
-                              </Text>
-                            )}
-                          </Pressable>
-                        </View>
-                      </>
-                    ) : (
-                      <Pressable
-                        style={[
-                          styles.actionButton,
-                          (!hasPhoneNumber || isBusy) && styles.disabledButton,
-                        ]}
-                        disabled={!hasPhoneNumber || isBusy}
-                        onPress={() =>
-                          runAuthAction(
-                            'phoneSend',
-                            async () =>
-                              sendPhoneVerificationCode(
-                                phoneNumber,
-                                await getRecaptchaVerifier()
-                              ),
-                            'Codigo SMS enviado.'
-                          )
-                        }
-                      >
-                        {busyAction === 'phoneSend' ? (
-                          <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                          <Text style={styles.actionButtonText}>
-                            Enviar codigo SMS
-                          </Text>
-                        )}
-                      </Pressable>
-                    )}
-                    {feedbackMethod === AUTH_METHODS.PHONE ? (
                       <AuthFeedback
                         message={message}
                         errorMessage={errorMessage}

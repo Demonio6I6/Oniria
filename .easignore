@@ -4,9 +4,12 @@ functions/node_modules/
 
 # Expo/local output
 .expo/
+.expo-dist/
+.firebase/
 dist/
 web-build/
 expo-env.d.ts
+store-assets/
 
 # Native build output and caches
 android/.gradle/

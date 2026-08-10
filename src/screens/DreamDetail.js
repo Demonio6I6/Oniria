@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import AppIcon from '../components/AppIcon';
+import ReportAiContentButton from '../components/ReportAiContentButton';
 import {
   getDreamId,
   getDreamInterpretation,
@@ -141,6 +142,10 @@ export default function DreamDetail({ navigation, route }) {
             <Text style={styles.eyebrow}>LECTURA ORIENTATIVA</Text>
             <Text style={styles.sectionTitle}>Una posibilidad para explorar</Text>
             <Markdown style={markdownStyles}>{interpretation}</Markdown>
+            <ReportAiContentButton
+              content={interpretation}
+              feature="saved-dream-interpretation"
+            />
           </View>
         ) : (
           <View style={styles.manualBlock}>

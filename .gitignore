@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.expo-dist/
 dist/
 web-build/
 expo-env.d.ts
@@ -35,7 +36,12 @@ yarn-error.*
 .env*.local
 !.env.example
 
+# EAS local signing credentials
+credentials.json
+.eas-credentials/
+
 # Firebase / Google service config
+.firebase/
 assets/google-services.json
 assets/GoogleService-Info.plist
 android/app/google-services.json
