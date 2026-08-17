@@ -18,7 +18,12 @@ import {
   revokeMonthlyAnalysisPrivacyNotice,
 } from '../services/privacyRepository';
 import { clearCurrentUserLocalData } from '../services/userStorage';
-import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { radii, screenPadding, spacing, typography } from '../theme/tokens';
+import {
+  THEME_PREFERENCES,
+  useAppTheme,
+  useThemeStyles,
+} from '../theme/ThemeContext';
 
 const PRIVACY_POLICY_URL = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL || '';
 const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL || '';
@@ -26,10 +31,13 @@ const ACCOUNT_DELETION_URL =
   process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL || '';
 
 function InformationRow({ icon, title, text }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+
   return (
     <View style={styles.informationRow}>
       <View style={styles.informationIcon}>
-        <AppIcon name={icon} size={19} color="#4338CA" />
+        <AppIcon name={icon} size={19} color={colors.primary} />
       </View>
       <View style={styles.informationCopy}>
         <Text style={styles.informationTitle}>{title}</Text>
@@ -45,6 +53,8 @@ export default function Configuracion({
   deleteAccount,
 }) {
   const { clearRespuestas } = useContext(GlobalContext);
+  const { colors, preference, setThemePreference } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const [aiConsent, setAiConsent] = useState(false);
   const [monthlyConsent, setMonthlyConsent] = useState(false);
   const [busyAction, setBusyAction] = useState('');
@@ -68,7 +78,7 @@ export default function Configuracion({
   const handleRevokeAiConsent = () => {
     Alert.alert(
       'Revocar consentimiento de IA',
-      'Lunentra volverá a pedirte permiso antes de enviar un sueño o un análisis mensual a la IA.',
+      'Lunentra volverá a pedirte permiso antes de enviar un sueño, su contexto reciente o una lectura profunda a la IA.',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -225,6 +235,48 @@ export default function Configuracion({
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.appearanceCard}>
+        <Text style={styles.appearanceEyebrow}>CONFIGURACIÓN</Text>
+        <Text style={styles.appearanceTitle}>Apariencia</Text>
+        <Text style={styles.appearanceText}>
+          Elige una pantalla cómoda para cada momento. El modo Sistema se adapta
+          automáticamente a tu dispositivo.
+        </Text>
+        <View
+          accessibilityRole="radiogroup"
+          style={styles.appearanceOptions}
+        >
+          {[
+            [THEME_PREFERENCES.system, 'Sistema'],
+            [THEME_PREFERENCES.light, 'Claro'],
+            [THEME_PREFERENCES.dark, 'Oscuro'],
+          ].map(([value, label]) => {
+            const selected = preference === value;
+            return (
+              <TouchableOpacity
+                key={value}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => setThemePreference(value)}
+                style={[
+                  styles.appearanceOption,
+                  selected && styles.appearanceOptionSelected,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.appearanceOptionText,
+                    selected && styles.appearanceOptionTextSelected,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
       <View style={styles.heroCard}>
         <Text style={styles.eyebrow}>TU INTIMIDAD IMPORTA</Text>
         <Text style={styles.heroTitle}>Tus sueños siguen bajo tu control.</Text>
@@ -244,7 +296,7 @@ export default function Configuracion({
         <InformationRow
           icon="send"
           title="Envío solo cuando lo solicitas"
-          text="Para generar una lectura se envía el sueño y el contexto relevante a nuestro servidor y al proveedor de IA."
+          text="Para generar una lectura se envían el sueño, el contexto que elegiste y, si existe, el sueño anterior reciente."
         />
         <InformationRow
           icon="profile"
@@ -284,7 +336,7 @@ export default function Configuracion({
             disabled={busyAction === 'consent'}
           >
             {busyAction === 'consent' ? (
-              <ActivityIndicator color="#4338CA" size="small" />
+              <ActivityIndicator color={colors.primary} size="small" />
             ) : (
               <Text style={styles.outlineButtonText}>Revocar consentimiento</Text>
             )}
@@ -304,7 +356,7 @@ export default function Configuracion({
           disabled={busyAction === 'notifications'}
         >
           {busyAction === 'notifications' ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={colors.white} size="small" />
           ) : (
             <Text style={styles.primaryButtonText}>Activar recordatorios</Text>
           )}
@@ -324,7 +376,7 @@ export default function Configuracion({
             onPress={handleOpenPrivacyPolicy}
           >
             <Text style={styles.linkButtonText}>Leer política de privacidad</Text>
-            <AppIcon name="arrowRight" size={17} color="#4338CA" />
+            <AppIcon name="arrowRight" size={17} color={colors.primary} />
           </TouchableOpacity>
         ) : (
           <View style={styles.pendingPolicyBox}>
@@ -337,7 +389,7 @@ export default function Configuracion({
         {!!TERMS_URL && (
           <TouchableOpacity style={styles.linkButton} onPress={handleOpenTerms}>
             <Text style={styles.linkButtonText}>Leer términos de uso</Text>
-            <AppIcon name="arrowRight" size={17} color="#4338CA" />
+            <AppIcon name="arrowRight" size={17} color={colors.primary} />
           </TouchableOpacity>
         )}
         {!!ACCOUNT_DELETION_URL && (
@@ -346,7 +398,7 @@ export default function Configuracion({
             onPress={handleOpenAccountDeletion}
           >
             <Text style={styles.linkButtonText}>Eliminación de cuenta en la web</Text>
-            <AppIcon name="arrowRight" size={17} color="#4338CA" />
+            <AppIcon name="arrowRight" size={17} color={colors.primary} />
           </TouchableOpacity>
         )}
       </View>
@@ -364,7 +416,7 @@ export default function Configuracion({
             disabled={busyAction === 'deleteAccount'}
           >
             {busyAction === 'deleteAccount' ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={colors.white} size="small" />
             ) : (
               <Text style={styles.dangerButtonText}>Eliminar mi cuenta</Text>
             )}
@@ -384,7 +436,7 @@ export default function Configuracion({
           disabled={busyAction === 'deleteLocal'}
         >
           {busyAction === 'deleteLocal' ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={colors.white} size="small" />
           ) : (
             <Text style={styles.dangerButtonText}>Borrar datos locales</Text>
           )}
@@ -394,7 +446,7 @@ export default function Configuracion({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   screen: {
     backgroundColor: colors.background,
     flex: 1,
@@ -403,6 +455,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding,
     paddingTop: spacing.lg,
     paddingBottom: 36,
+  },
+  appearanceCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    marginBottom: spacing.xxl,
+    padding: spacing.lg,
+  },
+  appearanceEyebrow: {
+    ...typography.eyebrow,
+    color: colors.primary,
+  },
+  appearanceTitle: {
+    ...typography.sectionTitle,
+    color: colors.ink,
+    marginTop: spacing.xs,
+  },
+  appearanceText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: spacing.xs,
+  },
+  appearanceOptions: {
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    marginTop: spacing.lg,
+    padding: 3,
+  },
+  appearanceOption: {
+    alignItems: 'center',
+    borderColor: 'transparent',
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 42,
+    paddingHorizontal: spacing.xs,
+  },
+  appearanceOptionSelected: {
+    backgroundColor: colors.surface,
+    borderColor: colors.primary,
+  },
+  appearanceOptionText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  appearanceOptionTextSelected: {
+    color: colors.primary,
+    fontWeight: '800',
   },
   heroCard: {
     marginBottom: spacing.xxl,
@@ -485,7 +590,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successSoft,
   },
   statusBadgeText: {
-    color: '#64748B',
+    color: colors.muted,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -518,7 +623,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -542,7 +647,7 @@ const styles = StyleSheet.create({
     padding: 11,
   },
   pendingPolicyText: {
-    color: '#9A3412',
+    color: colors.warning,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -565,7 +670,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   dangerButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '800',
   },

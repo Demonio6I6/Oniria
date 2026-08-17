@@ -40,6 +40,10 @@ yarn-error.*
 credentials.json
 .eas-credentials/
 
+# EAS build artifacts
+.eas-artifacts/
+*.aab
+
 # Firebase / Google service config
 .firebase/
 assets/google-services.json
@@ -48,6 +52,9 @@ android/app/google-services.json
 
 # typescript
 *.tsbuildinfo
+
+# Android/Kotlin generated files
+android/.kotlin/
 
 
 .history/

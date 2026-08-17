@@ -16,16 +16,16 @@ const {
 
 const REGION = "europe-west1";
 const PROJECT_ID = "post-it-72f0b";
+// Play Integrity validado con una build instalada desde Google Play.
+const ENFORCE_APP_CHECK = true;
 const ANONYMOUS_ACCOUNT_TTL_DAYS = 30;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const DREAM_INTERPRETATION_LIMIT_MS = DAY_IN_MS;
 const DREAM_INTERPRETATION_RESERVATION_TTL_MS = 10 * 60 * 1000;
 const GUEST_INTERPRETATION_LIMIT = 1;
 const FREE_INTERPRETATION_LIMIT = 3;
 const PREMIUM_MONTHLY_INTERPRETATION_LIMIT = 15;
-const PREMIUM_DAILY_INTERPRETATION_LIMIT = 2;
-const MONTHLY_EMOTIONAL_ANALYSIS_MIN_DREAMS = 10;
-const MONTHLY_EMOTIONAL_ANALYSIS_LIMIT_MS = 30 * DAY_IN_MS;
+const MONTHLY_EMOTIONAL_ANALYSIS_MIN_DREAMS = 6;
+const DEEP_PATTERN_ANALYSIS_COOLDOWN_MS = 30 * DAY_IN_MS;
 const MONTHLY_EMOTIONAL_ANALYSIS_RESERVATION_TTL_MS = 10 * 60 * 1000;
 const RECENT_AUTH_MAX_AGE_MS = 15 * 60 * 1000;
 const REVENUECAT_API_URL = "https://api.revenuecat.com/v1";
@@ -57,6 +57,8 @@ const PRODUCT_EVENT_PROPERTY_NAMES = new Set([
   "method",
   "monthlyDreams",
   "packageId",
+  "previousDreamAgeDays",
+  "recentContextUsed",
   "reason",
   "source",
   "totalDreams",
@@ -546,26 +548,28 @@ function mergeOpenAiUsageStats(sourceValue, targetValue) {
   return targetValue ?? sourceValue;
 }
 
-function getUtcDayKey(millis = Date.now()) {
-  return new Date(millis).toISOString().slice(0, 10);
-}
-
 function getUtcMonthKey(millis = Date.now()) {
   return new Date(millis).toISOString().slice(0, 7);
-}
-
-function getNextUtcDayMillis(millis = Date.now()) {
-  const date = new Date(millis);
-  return Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate() + 1,
-  );
 }
 
 function getNextUtcMonthMillis(millis = Date.now()) {
   const date = new Date(millis);
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+}
+
+function getMonthlyAnalysisResetMillis(usage, nowMs = Date.now()) {
+  const storedNextAvailableAt = getTimestampMillis(
+      usage.nextMonthlyAnalysisAvailableAt,
+  );
+  if (storedNextAvailableAt && storedNextAvailableAt > nowMs) {
+    return storedNextAvailableAt;
+  }
+
+  const lastAnalysisAt = getTimestampMillis(usage.lastMonthlyAnalysisAt);
+  if (!lastAnalysisAt) return null;
+
+  const nextAvailableAt = lastAnalysisAt + DEEP_PATTERN_ANALYSIS_COOLDOWN_MS;
+  return nextAvailableAt > nowMs ? nextAvailableAt : null;
 }
 
 function getActivePremiumState(entitlementData) {
@@ -590,7 +594,11 @@ async function getUserAccess(uid, authToken) {
   };
 }
 
-async function buildUserAccessStatus(uid, authToken, installationId) {
+async function buildUserAccessStatus(
+    uid,
+    authToken,
+    installationId,
+) {
   const installationTrialRef = getInstallationTrialRef(installationId);
   const [access, usageSnapshot, installationSnapshot] = await Promise.all([
     getUserAccess(uid, authToken),
@@ -603,16 +611,9 @@ async function buildUserAccessStatus(uid, authToken, installationId) {
     {};
   const nowMs = Date.now();
   const interpretationCount = getCount(usage.interpretationCount);
-  const nextInterpretationAt = getTimestampMillis(
-      usage.nextInterpretationAvailableAt,
-  );
   const monthKey = getUtcMonthKey(nowMs);
-  const dayKey = getUtcDayKey(nowMs);
   const premiumMonthlyUsed = usage.premiumMonthKey === monthKey ?
     getCount(usage.premiumMonthInterpretationCount) :
-    0;
-  const premiumDailyUsed = usage.premiumDayKey === dayKey ?
-    getCount(usage.premiumDayInterpretationCount) :
     0;
 
   let interpretationLimit = FREE_INTERPRETATION_LIMIT;
@@ -642,20 +643,12 @@ async function buildUserAccessStatus(uid, authToken, installationId) {
     if (interpretationRemaining === 0) {
       blockedReason = "premium-monthly-limit";
       retryAtMillis = getNextUtcMonthMillis(nowMs);
-    } else if (premiumDailyUsed >= PREMIUM_DAILY_INTERPRETATION_LIMIT) {
-      blockedReason = "premium-daily-limit";
-      retryAtMillis = getNextUtcDayMillis(nowMs);
     }
   } else if (interpretationRemaining === 0) {
     blockedReason = "free-interpretation-limit";
-  } else if (nextInterpretationAt && nextInterpretationAt > nowMs) {
-    blockedReason = "daily-interpretation-limit";
-    retryAtMillis = nextInterpretationAt;
   }
 
-  const nextMonthlyAnalysisAt = getTimestampMillis(
-      usage.nextMonthlyAnalysisAvailableAt,
-  );
+  const nextMonthlyAnalysisAt = getMonthlyAnalysisResetMillis(usage, nowMs);
 
   return {
     accountType: access.isAnonymous ?
@@ -666,7 +659,6 @@ async function buildUserAccessStatus(uid, authToken, installationId) {
     limits: {
       freeInterpretations: FREE_INTERPRETATION_LIMIT,
       guestInterpretations: GUEST_INTERPRETATION_LIMIT,
-      premiumDailyInterpretations: PREMIUM_DAILY_INTERPRETATION_LIMIT,
       premiumMonthlyInterpretations: PREMIUM_MONTHLY_INTERPRETATION_LIMIT,
     },
     interpretations: {
@@ -677,10 +669,12 @@ async function buildUserAccessStatus(uid, authToken, installationId) {
       retryAt: retryAtMillis ? new Date(retryAtMillis).toISOString() : null,
       retryAtMillis,
       totalUsed: interpretationCount,
-      premiumDailyLimit: PREMIUM_DAILY_INTERPRETATION_LIMIT,
-      premiumDailyUsed,
       premiumMonthlyUsed,
       periodKey: access.isPremium ? monthKey : null,
+      resetsAt: access.isPremium ?
+        new Date(getNextUtcMonthMillis(nowMs)).toISOString() :
+        null,
+      resetsAtMillis: access.isPremium ? getNextUtcMonthMillis(nowMs) : null,
     },
     monthlyAnalysis: {
       minimumDreams: MONTHLY_EMOTIONAL_ANALYSIS_MIN_DREAMS,
@@ -904,12 +898,8 @@ async function claimDreamInterpretationQuota(
 
     const interpretationCount = getCount(usage.interpretationCount);
     const premiumMonthKey = getUtcMonthKey(nowMs);
-    const premiumDayKey = getUtcDayKey(nowMs);
     const premiumMonthlyUsed = usage.premiumMonthKey === premiumMonthKey ?
       getCount(usage.premiumMonthInterpretationCount) :
-      0;
-    const premiumDailyUsed = usage.premiumDayKey === premiumDayKey ?
-      getCount(usage.premiumDayInterpretationCount) :
       0;
 
     if (
@@ -957,37 +947,6 @@ async function claimDreamInterpretationQuota(
       );
     }
 
-    if (
-      access?.isPremium &&
-      premiumDailyUsed >= PREMIUM_DAILY_INTERPRETATION_LIMIT
-    ) {
-      const retryAtMillis = getNextUtcDayMillis(nowMs);
-      createResourceExhaustedError(
-          "Alcanzaste el limite operativo de lecturas Premium por hoy.",
-          {
-            reason: "premium-daily-limit",
-            limit: PREMIUM_DAILY_INTERPRETATION_LIMIT,
-            retryAt: new Date(retryAtMillis).toISOString(),
-            retryAtMillis,
-          },
-      );
-    }
-
-    const nextAvailableAt = getTimestampMillis(
-        usage.nextInterpretationAvailableAt,
-    );
-
-    if (!access?.isPremium && nextAvailableAt && nextAvailableAt > nowMs) {
-      createResourceExhaustedError(
-          "Ya usaste tu interpretacion disponible por hoy.",
-          {
-            reason: "daily-interpretation-limit",
-            retryAt: new Date(nextAvailableAt).toISOString(),
-            retryAtMillis: nextAvailableAt,
-          },
-      );
-    }
-
     transaction.set(
         usageRef,
         {
@@ -1031,7 +990,6 @@ async function completeDreamInterpretationQuota(
   const usageRef = getAiUsageRef(uid);
   const sessionRef = getDreamSessionRef(uid, dreamSessionId);
   const nowMs = Date.now();
-  const nextAvailableAtMs = nowMs + DREAM_INTERPRETATION_LIMIT_MS;
   const installationTrialRef = access?.isAnonymous ?
     getInstallationTrialRef(installationId) :
     null;
@@ -1066,22 +1024,17 @@ async function completeDreamInterpretationQuota(
     }
 
     const premiumMonthKey = getUtcMonthKey(nowMs);
-    const premiumDayKey = getUtcDayKey(nowMs);
     const premiumMonthlyUsed = usage.premiumMonthKey === premiumMonthKey ?
       getCount(usage.premiumMonthInterpretationCount) :
-      0;
-    const premiumDailyUsed = usage.premiumDayKey === premiumDayKey ?
-      getCount(usage.premiumDayInterpretationCount) :
       0;
     const quotaUpdates = access?.isPremium ? {
       nextInterpretationAvailableAt:
         admin.firestore.FieldValue.delete(),
       premiumMonthKey,
       premiumMonthInterpretationCount: premiumMonthlyUsed + 1,
-      premiumDayKey,
-      premiumDayInterpretationCount: premiumDailyUsed + 1,
     } : {
-      nextInterpretationAvailableAt: toTimestamp(nextAvailableAtMs),
+      nextInterpretationAvailableAt:
+        admin.firestore.FieldValue.delete(),
     };
 
     transaction.set(
@@ -1190,7 +1143,7 @@ function assertMonthlyEmotionalAnalysisDreamCount(dreamCount) {
 
   throw new HttpsError(
       "failed-precondition",
-      "Necesitas mas suenos guardados para generar el analisis mensual.",
+      "Necesitas mas suenos guardados para generar la lectura profunda.",
       {
         reason: "monthly-analysis-min-dreams",
         requiredDreams: MONTHLY_EMOTIONAL_ANALYSIS_MIN_DREAMS,
@@ -1217,7 +1170,7 @@ async function claimMonthlyEmotionalAnalysisQuota(uid) {
 
     if (reservationExpiresAt && reservationExpiresAt > nowMs) {
       createResourceExhaustedError(
-          "Ya hay un analisis mensual en curso.",
+          "Ya hay una lectura profunda en curso.",
           {
             reason: "monthly-analysis-in-progress",
             retryAt: new Date(reservationExpiresAt).toISOString(),
@@ -1226,13 +1179,11 @@ async function claimMonthlyEmotionalAnalysisQuota(uid) {
       );
     }
 
-    const nextAvailableAt = getTimestampMillis(
-        usage.nextMonthlyAnalysisAvailableAt,
-    );
+    const nextAvailableAt = getMonthlyAnalysisResetMillis(usage, nowMs);
 
     if (nextAvailableAt && nextAvailableAt > nowMs) {
       createResourceExhaustedError(
-          "Ya generaste tu analisis mensual disponible.",
+          "Ya generaste tu lectura profunda disponible.",
           {
             reason: "monthly-analysis-cooldown",
             retryAt: new Date(nextAvailableAt).toISOString(),
@@ -1265,7 +1216,7 @@ async function completeMonthlyEmotionalAnalysisQuota(
 ) {
   const usageRef = getAiUsageRef(uid);
   const nowMs = Date.now();
-  const nextAvailableAtMs = nowMs + MONTHLY_EMOTIONAL_ANALYSIS_LIMIT_MS;
+  const nextAvailableAtMs = nowMs + DEEP_PATTERN_ANALYSIS_COOLDOWN_MS;
 
   await admin.firestore().runTransaction(async (transaction) => {
     const snapshot = await transaction.get(usageRef);
@@ -1275,7 +1226,7 @@ async function completeMonthlyEmotionalAnalysisQuota(
     if (activeReservation?.id !== reservationId) {
       throw new HttpsError(
           "aborted",
-          "La reserva de analisis mensual ya no esta activa.",
+          "La reserva de la lectura profunda ya no esta activa.",
       );
     }
 
@@ -1293,6 +1244,8 @@ async function completeMonthlyEmotionalAnalysisQuota(
         {merge: true},
     );
   });
+
+  return nextAvailableAtMs;
 }
 
 async function releaseMonthlyEmotionalAnalysisQuota(uid, reservationId) {
@@ -1417,6 +1370,7 @@ async function releaseDreamSessionAction(uid, dreamSessionId, actionField) {
 function aiFunction(handler) {
   return onCall(
       {
+        enforceAppCheck: ENFORCE_APP_CHECK,
         region: REGION,
         secrets: [openaiApiKey],
         timeoutSeconds: 120,
@@ -1454,6 +1408,7 @@ function aiFunction(handler) {
 
 exports.getAccessStatus = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       timeoutSeconds: 30,
     },
@@ -1474,6 +1429,7 @@ exports.getAccessStatus = onCall(
 
 exports.trackProductEvent = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       timeoutSeconds: 15,
     },
@@ -1534,6 +1490,7 @@ exports.trackProductEvent = onCall(
 
 exports.reportAiContent = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       timeoutSeconds: 15,
     },
@@ -1606,6 +1563,7 @@ exports.reportAiContent = onCall(
 
 exports.migrateAnonymousServerState = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       timeoutSeconds: 120,
     },
@@ -1750,6 +1708,7 @@ exports.migrateAnonymousServerState = onCall(
 
 exports.deleteAnonymousUserData = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       timeoutSeconds: 120,
     },
@@ -1782,6 +1741,7 @@ exports.deleteAnonymousUserData = onCall(
 
 exports.deleteUserAccountData = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       secrets: [revenueCatRestApiKey],
       timeoutSeconds: 120,
@@ -1817,6 +1777,7 @@ exports.deleteUserAccountData = onCall(
 
 exports.syncRevenueCatSubscription = onCall(
     {
+      enforceAppCheck: ENFORCE_APP_CHECK,
       region: REGION,
       secrets: [revenueCatRestApiKey],
       timeoutSeconds: 30,
@@ -1904,6 +1865,9 @@ exports.interpretDream = aiFunction(async (data, apiKey, uid, authToken) => {
   const contextoPerfil = readString(data, "contextoPerfil", {
     maxLength: 8000,
   });
+  const contextoReciente = readString(data, "contextoReciente", {
+    maxLength: 2500,
+  });
   const dreamSessionId = readString(data, "dreamSessionId", {
     required: true,
     maxLength: 120,
@@ -1925,6 +1889,7 @@ exports.interpretDream = aiFunction(async (data, apiKey, uid, authToken) => {
         apiKey,
         descripcion,
         contextoPerfil,
+        contextoReciente,
         createOpenAiUsageRecorder(uid, "interpretDream"),
     );
 
@@ -2097,17 +2062,23 @@ exports.findEmotionalPattern = aiFunction(async (
         periodo,
         createOpenAiUsageRecorder(uid, "findEmotionalPattern"),
     );
-    await completeMonthlyEmotionalAnalysisQuota(
-        uid,
-        reservationId,
-        suenos.length,
-    );
-    return {text};
+    const nextAvailableAtMillis =
+      await completeMonthlyEmotionalAnalysisQuota(
+          uid,
+          reservationId,
+          suenos.length,
+      );
+    return {
+      text,
+      nextAvailableAt:
+        new Date(nextAvailableAtMillis).toISOString(),
+      nextAvailableAtMillis,
+    };
   } catch (error) {
     try {
       await releaseMonthlyEmotionalAnalysisQuota(uid, reservationId);
     } catch (releaseError) {
-      console.error("Error liberando analisis mensual:", releaseError);
+      console.error("Error liberando la lectura profunda:", releaseError);
     }
     throw error;
   }

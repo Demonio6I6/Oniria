@@ -11,7 +11,8 @@ import AppIcon from './AppIcon';
 import { navigationRef } from '../utils/navigationRef';
 import { trackProductEvent } from '../services/productAnalytics';
 import { openSubscriptionManagement } from '../services/subscriptionManagement';
-import { colors, radii } from '../theme/tokens';
+import { radii } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const ACCOUNT_REASONS = new Set([
   'account-required',
@@ -55,7 +56,7 @@ const getAccountCopy = (reason, remainingAfterAccount) => {
   if (reason === 'monthly-analysis-account') {
     return {
       title: 'Activa tu espacio personal',
-      body: 'Crea una cuenta gratuita para continuar. Después podrás revisar la opción Premium para generar el análisis mensual.',
+      body: 'Crea una cuenta gratuita para continuar. Después podrás revisar la opción Premium para generar tu lectura profunda.',
       action: 'Crear cuenta y continuar',
     };
   }
@@ -70,8 +71,8 @@ const getAccountCopy = (reason, remainingAfterAccount) => {
 const getPremiumCopy = (reason, monthlyLimit) => {
   if (reason === 'monthly-analysis') {
     return {
-      title: 'Descubre el patrón completo del mes',
-      body: 'Premium conecta cambios, repeticiones y preguntas abiertas usando los registros que ya guardaste.',
+      title: 'Descubre los patrones de tu historia',
+      body: 'Premium conecta cambios, repeticiones y preguntas abiertas usando tus sueños recientes.',
     };
   }
 
@@ -84,11 +85,13 @@ const getPremiumCopy = (reason, monthlyLimit) => {
 
   return {
     title: 'Profundiza en tus patrones',
-    body: `Premium incluye hasta ${monthlyLimit} lecturas al mes y una lectura profunda de tus patrones mensuales.`,
+    body: `Premium incluye hasta ${monthlyLimit} lecturas al mes y una lectura profunda de tus patrones recientes.`,
   };
 };
 
 export default function PremiumPaywallModal({ subscription }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const [selectedPackageId, setSelectedPackageId] = useState('');
 
   const packages = subscription.packages || [];
@@ -143,7 +146,7 @@ export default function PremiumPaywallModal({ subscription }) {
               <AppIcon
                 name={needsAccount ? 'profile' : 'sparkles'}
                 size={22}
-                color="#111827"
+                color={colors.ink}
               />
             </View>
             <Pressable
@@ -153,7 +156,7 @@ export default function PremiumPaywallModal({ subscription }) {
               onPress={subscription.hidePaywall}
               style={styles.closeButton}
             >
-              <AppIcon name="close" size={20} color="#111827" />
+              <AppIcon name="close" size={20} color={colors.ink} />
             </Pressable>
           </View>
 
@@ -177,7 +180,7 @@ export default function PremiumPaywallModal({ subscription }) {
                 <Text style={styles.benefitText}>• Diario manual ilimitado</Text>
                 <Text style={styles.benefitText}>• Hasta {monthlyLimit} lecturas de IA al mes</Text>
                 <Text style={styles.benefitText}>• Una ampliación por cada lectura</Text>
-                <Text style={styles.benefitText}>• Análisis profundo mensual</Text>
+                <Text style={styles.benefitText}>• Lectura profunda desde 6 sueños</Text>
               </View>
 
               {packages.length ? (
@@ -229,7 +232,7 @@ export default function PremiumPaywallModal({ subscription }) {
                 onPress={handlePurchase}
               >
                 {isBusy ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={colors.white} size="small" />
                 ) : (
                   <Text style={styles.primaryButtonText}>Suscribirme</Text>
                 )}
@@ -269,10 +272,10 @@ export default function PremiumPaywallModal({ subscription }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   backdrop: {
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    backgroundColor: 'rgba(2, 6, 12, 0.68)',
     flex: 1,
     justifyContent: 'flex-end',
   },
@@ -328,7 +331,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   benefitText: {
-    color: '#374151',
+    color: colors.ink,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -353,31 +356,31 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   packageTitle: {
-    color: '#111827',
+    color: colors.ink,
     fontSize: 15,
     fontWeight: '800',
   },
   packageDescription: {
-    color: '#6B7280',
+    color: colors.muted,
     fontSize: 12,
     lineHeight: 17,
     marginTop: 2,
   },
   packagePrice: {
-    color: '#111827',
+    color: colors.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   emptyBox: {
-    backgroundColor: '#F9FAFB',
-    borderColor: '#E5E7EB',
+    backgroundColor: colors.surfaceSoft,
+    borderColor: colors.line,
     borderRadius: 8,
     borderWidth: 1,
     marginTop: 18,
     padding: 14,
   },
   emptyText: {
-    color: '#6B7280',
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -392,7 +395,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -408,14 +411,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   errorText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontSize: 13,
     lineHeight: 18,
     marginTop: 8,
     textAlign: 'center',
   },
   billingNote: {
-    color: '#6B7280',
+    color: colors.muted,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 8,

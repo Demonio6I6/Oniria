@@ -1,21 +1,16 @@
 import { Platform } from 'react-native';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
-import { app } from '../firebase/config';
+import { createProtectedCallable } from '../firebase/callable';
 import { getInstallationId } from './installationId';
 
 export const PREMIUM_ENTITLEMENT_ID =
   process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'Premium';
 
-const REGION = 'europe-west1';
-const functions = getFunctions(app, REGION);
-const syncSubscriptionCallable = httpsCallable(
-  functions,
+const syncSubscriptionCallable = createProtectedCallable(
   'syncRevenueCatSubscription',
   { timeout: 60000 }
 );
-const getAccessStatusCallable = httpsCallable(
-  functions,
+const getAccessStatusCallable = createProtectedCallable(
   'getAccessStatus',
   { timeout: 30000 }
 );

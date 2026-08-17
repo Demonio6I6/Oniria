@@ -1,15 +1,20 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from './src/firebase/config';
+import { createProtectedCallable } from './src/firebase/callable';
 import { getInstallationId } from './src/services/installationId';
 
-const REGION = 'europe-west1';
-const functions = getFunctions(app, REGION);
+async function callFunction(name, payload) {
+  const callable = createProtectedCallable(name, { timeout: 120000 });
+  const installationId = await getInstallationId();
+  const result = await callable({
+    ...payload,
+    installationId,
+  });
+
+  return result.data;
+}
 
 async function callTextFunction(name, payload) {
-  const callable = httpsCallable(functions, name, { timeout: 120000 });
-  const installationId = await getInstallationId();
-  const result = await callable({ ...payload, installationId });
-  const text = result.data?.text;
+  const data = await callFunction(name, payload);
+  const text = data?.text;
 
   if (typeof text !== 'string') {
     throw new Error(`La función ${name} no devolvió texto válido.`);
@@ -21,11 +26,13 @@ async function callTextFunction(name, payload) {
 export const obtenerInterpretacionSueno = async (
   descripcion,
   contextoPerfil = '',
+  contextoReciente = '',
   dreamSessionId = ''
 ) => {
   return callTextFunction('interpretDream', {
     descripcion,
     contextoPerfil,
+    contextoReciente,
     dreamSessionId,
   });
 };
@@ -59,23 +66,22 @@ export const obtenerEmocionesDesdeContexto = async (
   contextoPerfil,
   dreamSessionId = ''
 ) => {
-  const callable = httpsCallable(
-    functions,
-    'extractDreamEmotions',
-    { timeout: 120000 }
-  );
-  const installationId = await getInstallationId();
-  const result = await callable({
+  const data = await callFunction('extractDreamEmotions', {
     descripcion,
     contextoPerfil,
     dreamSessionId,
-    installationId,
   });
-  const emociones = result.data?.emociones;
+  const emociones = data?.emociones;
 
   return Array.isArray(emociones) ? emociones : [];
 };
 
 export const obtenerPatronEmocional = async (suenos, periodo = '') => {
-  return callTextFunction('findEmotionalPattern', { suenos, periodo });
+  const data = await callFunction('findEmotionalPattern', { suenos, periodo });
+
+  if (typeof data?.text !== 'string') {
+    throw new Error('La función findEmotionalPattern no devolvió texto válido.');
+  }
+
+  return data;
 };

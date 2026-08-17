@@ -1,7 +1,9 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppIcon from './AppIcon';
-import { colors } from '../theme/tokens';
+import { spacing } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const ITEMS = [
   { route: 'Home', label: 'Inicio', icon: 'moon' },
@@ -12,8 +14,24 @@ const ITEMS = [
 ];
 
 export default function BottomNavigation({ activeRoute, onNavigate }) {
+  const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+  const bottomPadding = Math.max(insets.bottom, spacing.sm);
+
   return (
-    <View style={styles.container} accessibilityRole="tablist">
+    <View
+      style={[
+        styles.container,
+        {
+          minHeight: 64 + bottomPadding,
+          paddingBottom: bottomPadding,
+          paddingLeft: Math.max(insets.left, spacing.xs),
+          paddingRight: Math.max(insets.right, spacing.xs),
+        },
+      ]}
+      accessibilityRole="tablist"
+    >
       {ITEMS.map(item => {
         const active = activeRoute === item.route;
         const color = active ? colors.primary : colors.muted;
@@ -51,16 +69,13 @@ export default function BottomNavigation({ activeRoute, onNavigate }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   container: {
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderTopColor: colors.line,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    minHeight: 72,
-    paddingBottom: 8,
-    paddingHorizontal: 4,
     paddingTop: 7,
   },
   item: {

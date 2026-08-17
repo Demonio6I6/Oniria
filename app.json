@@ -6,12 +6,11 @@
     "scheme": "lunentra",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#07111F",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#07111F"
     },
     "ios": {
       "supportsTablet": true,
@@ -62,7 +61,10 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-system-ui",
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check"
     ],
     "owner": "hayda666",
     "extra": {

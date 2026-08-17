@@ -4,8 +4,8 @@ import {
   writeUserString,
 } from './userStorage';
 
-const AI_PRIVACY_CONSENT_VERSION = 'accepted_v1';
-const MONTHLY_ANALYSIS_PRIVACY_CONSENT_VERSION = 'accepted_v1';
+const AI_PRIVACY_CONSENT_VERSION = 'accepted_v2';
+const MONTHLY_ANALYSIS_PRIVACY_CONSENT_VERSION = 'accepted_v2';
 
 export const hasAcceptedAiPrivacyNotice = async () => {
   const storedValue = await readUserString(

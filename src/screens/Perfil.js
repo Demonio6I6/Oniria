@@ -13,7 +13,8 @@ import {
 import AppIcon from '../components/AppIcon';
 import { GlobalContext } from '../GlobalContext';
 import { PROFILE_QUESTIONS } from '../domain/profile';
-import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const QUESTION_GROUPS = [
   {
@@ -37,6 +38,7 @@ const QUESTION_GROUPS = [
 ];
 
 function AutoResizingTextInput({ value, onChangeText, placeholder, style }) {
+  const { colors } = useAppTheme();
   const [isFocused, setIsFocused] = useState(false);
   const [contentHeight, setContentHeight] = useState(44);
   const inputHeight = isFocused ? contentHeight : Math.min(contentHeight, 104);
@@ -60,6 +62,8 @@ function AutoResizingTextInput({ value, onChangeText, placeholder, style }) {
 }
 
 function SettingsRow({ icon, title, text, onPress, tone = 'default' }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const color = tone === 'danger' ? colors.danger : colors.ink;
 
   return (
@@ -80,7 +84,9 @@ function SettingsRow({ icon, title, text, onPress, tone = 'default' }) {
 
 export default function Perfil({ navigation, user, signOut }) {
   const { respuestas, updateRespuestas } = useContext(GlobalContext);
-  const [expandedGroup, setExpandedGroup] = useState('present');
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+  const [expandedGroup, setExpandedGroup] = useState('');
   const completedQuestions = PROFILE_QUESTIONS.filter(
     item => respuestas[item.key]?.trim()
   ).length;
@@ -230,9 +236,9 @@ export default function Perfil({ navigation, user, signOut }) {
             onPress={() => navigation.navigate('PlanPremium')}
           />
           <SettingsRow
-            icon="shield"
-            title="Privacidad y control"
-            text="Consentimientos, recordatorios y datos"
+            icon="settings"
+            title="Configuración"
+            text="Apariencia, privacidad y control"
             onPress={() => navigation.navigate('Configuracion')}
           />
           <SettingsRow
@@ -251,7 +257,7 @@ export default function Perfil({ navigation, user, signOut }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   keyboardView: { flex: 1 },
   screen: { backgroundColor: colors.background, flex: 1 },
   container: {
@@ -276,7 +282,7 @@ const styles = StyleSheet.create({
   progressTitle: { color: colors.white, fontSize: 14, fontWeight: '800' },
   progressCount: { color: colors.lavender, fontSize: 13, fontWeight: '800' },
   progressTrack: {
-    backgroundColor: '#303A4A',
+    backgroundColor: colors.line,
     borderRadius: radii.pill,
     height: 7,
     marginTop: spacing.md,
@@ -288,7 +294,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   privacyRow: { alignItems: 'center', flexDirection: 'row', marginTop: spacing.md },
-  privacyText: { color: '#BCC4D2', fontSize: 11, marginLeft: 6 },
+  privacyText: { color: colors.muted, fontSize: 11, marginLeft: 6 },
   groupsSection: { marginTop: spacing.xxxl },
   sectionTitle: { ...typography.sectionTitle, color: colors.ink },
   group: { borderBottomColor: colors.line, borderBottomWidth: 1 },

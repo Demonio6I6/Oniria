@@ -10,26 +10,28 @@ import {
 import AppIcon from '../components/AppIcon';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
 import { openSubscriptionManagement } from '../services/subscriptionManagement';
-import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const formatAvailability = (timestamp) => {
   if (!timestamp) return '';
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return '';
 
-  return date.toLocaleString('es-ES', {
+  return date.toLocaleDateString('es-ES', {
     day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
+    month: 'long',
   });
 };
 
 function Benefit({ children }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+
   return (
     <View style={styles.benefitRow}>
       <View style={styles.benefitIcon}>
-        <AppIcon name="check" size={15} color="#4338CA" />
+        <AppIcon name="check" size={15} color={colors.primary} />
       </View>
       <Text style={styles.benefitText}>{children}</Text>
     </View>
@@ -38,6 +40,8 @@ function Benefit({ children }) {
 
 export default function PlanPremium({ navigation }) {
   const subscription = useSubscriptionAccess();
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const status = subscription.accessStatus;
   const usage = status?.interpretations;
   const limits = status?.limits;
@@ -57,7 +61,7 @@ export default function PlanPremium({ navigation }) {
       ? 'Lunentra Premium'
       : 'Cuenta gratuita';
   const remaining = usage?.remaining ?? (subscription.isGuest ? 1 : freeLimit);
-  const retryLabel = formatAvailability(usage?.retryAtMillis);
+  const resetLabel = formatAvailability(usage?.resetsAtMillis);
 
   const handlePrimaryAction = () => {
     if (subscription.isGuest) {
@@ -87,7 +91,7 @@ export default function PlanPremium({ navigation }) {
             <Text style={styles.planName}>{planLabel}</Text>
           </View>
           {subscription.loading ? (
-            <ActivityIndicator color="#4338CA" size="small" />
+            <ActivityIndicator color={colors.primary} size="small" />
           ) : (
             <View style={styles.statusPill}>
               <Text style={styles.statusPillText}>
@@ -104,8 +108,9 @@ export default function PlanPremium({ navigation }) {
             </Text>
             <Text style={styles.usageLabel}>lecturas disponibles este mes</Text>
             <Text style={styles.usageHint}>
-              Uso de hoy: {usage?.premiumDailyUsed || 0}/
-              {limits?.premiumDailyInterpretations || 2}
+              {resetLabel
+                ? `Tus ${monthlyLimit} lecturas se renuevan el ${resetLabel}`
+                : 'Tus lecturas se renuevan al comenzar el próximo mes'}
             </Text>
           </>
         ) : (
@@ -118,17 +123,13 @@ export default function PlanPremium({ navigation }) {
             </Text>
           </>
         )}
-
-        {!!retryLabel && (
-          <Text style={styles.retryText}>Disponible de nuevo: {retryLabel}</Text>
-        )}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Lo que incluye Premium</Text>
         <Benefit>Hasta {monthlyLimit} lecturas de IA cada mes</Benefit>
         <Benefit>Una ampliación para profundizar en cada lectura</Benefit>
-        <Benefit>Análisis profundo de patrones una vez al mes</Benefit>
+        <Benefit>Lectura profunda de patrones desde 6 sueños</Benefit>
         <Benefit>Diario manual ilimitado sin consumir lecturas</Benefit>
       </View>
 
@@ -140,7 +141,7 @@ export default function PlanPremium({ navigation }) {
           <Text style={styles.primaryButtonText}>
             {subscription.isGuest ? 'Crear cuenta gratuita' : 'Ver Premium'}
           </Text>
-          <AppIcon name="arrowRight" size={18} color="#fff" />
+          <AppIcon name="arrowRight" size={18} color={colors.white} />
         </TouchableOpacity>
       )}
 
@@ -177,7 +178,7 @@ export default function PlanPremium({ navigation }) {
       )}
 
       <View style={styles.privacyNote}>
-        <AppIcon name="shield" size={18} color="#4B5563" />
+        <AppIcon name="shield" size={18} color={colors.muted} />
         <Text style={styles.privacyText}>
           Tu diario sigue cifrado en este dispositivo. Crear una cuenta no crea
           automáticamente una copia en la nube.
@@ -187,7 +188,7 @@ export default function PlanPremium({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   screen: {
     backgroundColor: colors.background,
     flex: 1,
@@ -292,7 +293,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   benefitText: {
-    color: '#374151',
+    color: colors.ink,
     flex: 1,
     fontSize: 14,
     lineHeight: 20,
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: colors.midnight,
     borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'center',
@@ -309,7 +310,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   primaryButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 15,
     fontWeight: '800',
     marginRight: 8,
@@ -321,19 +322,19 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   secondaryButtonText: {
-    color: '#4338CA',
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '800',
   },
   warningText: {
-    color: '#B45309',
+    color: colors.warning,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 8,
     textAlign: 'center',
   },
   errorText: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontSize: 12,
     lineHeight: 18,
     marginTop: 8,
@@ -341,14 +342,14 @@ const styles = StyleSheet.create({
   },
   privacyNote: {
     alignItems: 'flex-start',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: colors.surfaceSoft,
     borderRadius: 10,
     flexDirection: 'row',
     marginTop: 18,
     padding: 14,
   },
   privacyText: {
-    color: '#4B5563',
+    color: colors.muted,
     flex: 1,
     fontSize: 12,
     lineHeight: 18,

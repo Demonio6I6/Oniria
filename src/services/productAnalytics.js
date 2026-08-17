@@ -1,10 +1,6 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../firebase/config';
+import { createProtectedCallable } from '../firebase/callable';
 
-const REGION = 'europe-west1';
-const functions = getFunctions(app, REGION);
-const trackProductEventCallable = httpsCallable(
-  functions,
+const trackProductEventCallable = createProtectedCallable(
   'trackProductEvent',
   { timeout: 15000 }
 );

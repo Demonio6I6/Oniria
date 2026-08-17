@@ -8,7 +8,8 @@ import {
   View,
 } from 'react-native';
 import { reportAiContent } from '../services/aiContentReport';
-import { colors, radii, spacing } from '../theme/tokens';
+import { radii, spacing } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 import AppIcon from './AppIcon';
 
 const REPORT_REASONS = {
@@ -17,6 +18,8 @@ const REPORT_REASONS = {
 };
 
 export default function ReportAiContentButton({ content, feature }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const [status, setStatus] = useState('idle');
 
   const submitReport = async (reason) => {
@@ -95,7 +98,7 @@ export default function ReportAiContentButton({ content, feature }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   button: {
     alignSelf: 'flex-start',
     borderColor: colors.line,

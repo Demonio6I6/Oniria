@@ -11,14 +11,17 @@ import {
   View,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppIcon from '../components/AppIcon';
 import { getDreamId, getDreamSummary, getDreamTimestamp } from '../domain/dreams';
 import {
   deleteSavedDreamsByIds,
   getDreamCalendarData,
   loadSavedDreams,
+  subscribeToDreamRecords,
 } from '../services/dreamRepository';
-import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const getDayKey = timestamp => new Date(timestamp).toISOString().split('T')[0];
 
@@ -40,6 +43,9 @@ const groupDreamsByDay = dreams => {
 };
 
 export default function SuenosGuardados({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const [dreams, setDreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [calendarMode, setCalendarMode] = useState(false);
@@ -78,12 +84,26 @@ export default function SuenosGuardados({ navigation }) {
   useEffect(() => {
     loadDreams();
     const unsubscribe = navigation.addListener('focus', loadDreams);
-    return unsubscribe;
+    const dreamSubscription = subscribeToDreamRecords(loadDreams);
+
+    return () => {
+      unsubscribe();
+      dreamSubscription.remove();
+    };
   }, [navigation]);
 
   useEffect(() => {
-    navigation.setParams({ selectionMode });
-  }, [navigation, selectionMode]);
+    navigation.setParams({
+      hasDreams: !loading && dreams.length > 0,
+      selectionMode,
+    });
+  }, [dreams.length, loading, navigation, selectionMode]);
+
+  useEffect(() => {
+    if (loading || dreams.length > 0 || !selectionMode) return;
+    setSelectionMode(false);
+    setSelectedDreamIds([]);
+  }, [dreams.length, loading, selectionMode]);
 
   useEffect(() => {
     const enableListener = DeviceEventEmitter.addListener(
@@ -315,7 +335,12 @@ export default function SuenosGuardados({ navigation }) {
         onRequestClose={() => setDayDreamsModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View
+            style={[
+              styles.modalSheet,
+              { paddingBottom: Math.max(insets.bottom, 34) },
+            ]}
+          >
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Sueños de este día</Text>
             {dreamsOfTheDay.map(dream => (
@@ -346,7 +371,7 @@ export default function SuenosGuardados({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   screen: { backgroundColor: colors.background, flex: 1 },
   container: {
     flexGrow: 1,
@@ -520,7 +545,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 34,
     paddingHorizontal: screenPadding,
     paddingTop: spacing.md,
   },

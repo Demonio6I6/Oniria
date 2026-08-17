@@ -7,11 +7,11 @@ const MODEL_FAST = process.env.OPENAI_MODEL_FAST || "gpt-5.4-mini";
 const REASONING_LOW = "low";
 const REASONING_NONE = "none";
 const OUTPUT_LIMITS = {
-  dreamInterpretation: 1200,
-  dreamFollowUp: 700,
+  dreamInterpretation: 800,
+  dreamFollowUp: 500,
   interpretationSummary: 80,
   dreamEmotions: 120,
-  monthlyPattern: 1600,
+  monthlyPattern: 1200,
   dailyReflection: 80,
 };
 
@@ -129,26 +129,40 @@ async function obtenerInterpretacionSueno(
     apiKey,
     descripcion,
     contextoPerfil = "",
+    contextoReciente = "",
     onUsage,
 ) {
+  const input = [
+    "Explora este sueno como una lectura orientativa.",
+    `Sueno actual:\n${descripcion}`,
+    contextoPerfil,
+    contextoReciente,
+    "Responde de forma directa, entre 220 y 320 palabras. Conserva la " +
+      "lectura central, dos o tres hipotesis utiles, la relacion emocional " +
+      "con el momento personal y una sola pregunta final. Omite " +
+      "introducciones genericas, repeticiones y listas exhaustivas de " +
+      "simbolos.",
+    "Usa estas secciones:\n" +
+      "## Lectura central\n" +
+      "## Posibles significados\n" +
+      "## Emocion y momento personal\n" +
+      (contextoReciente ? "## Posible hilo reciente\n" : "") +
+      "## Una pregunta para ti",
+    contextoReciente ?
+      "Compara con el sueno anterior solo si existe una coincidencia " +
+        "concreta de emocion, persona, escena, conflicto o asociacion. " +
+        "No asumas que estan conectados ni fuerces un patron. Si no hay " +
+        "una continuidad clara, dilo en una frase breve." :
+      "No menciones continuidad con otros suenos porque no se aporto " +
+        "contexto reciente.",
+    "Presenta posibilidades, no una verdad unica. Cierra con una nota " +
+      "breve indicando que la lectura no es un diagnostico.",
+  ].filter(Boolean).join("\n\n");
+
   return createTextResponse(apiKey, {
     model: MODEL_DEEP,
     reasoningEffort: REASONING_LOW,
-    input:
-      `Explora este sueno como una lectura orientativa.\n\n` +
-      `Sueno:\n${descripcion}\n\n` +
-      `${contextoPerfil}\n\n` +
-      `Devuelve una respuesta clara con estas secciones:\n` +
-      `## Lo que observamos\n` +
-      `## Posibles lecturas\n` +
-      `## Emociones posibles\n` +
-      `## Simbolos o escenas relevantes\n` +
-      `## Relacion con tu momento personal\n` +
-      `## Preguntas para reflexionar\n\n` +
-      `No afirmes que el sueno significa una sola cosa. Si falta contexto ` +
-      `personal, indicalo brevemente. Cierra con una nota breve recordando ` +
-      `que no es un diagnostico. Mantente en un maximo aproximado de ` +
-      `650 palabras.`,
+    input,
     maxOutputTokens: OUTPUT_LIMITS.dreamInterpretation,
     onUsage,
   });
@@ -165,7 +179,8 @@ async function obtenerRespuestaChat(
     "Esta es la unica ampliacion permitida dentro de la interpretacion " +
       "del sueno. Responde a la duda o al nuevo detalle del usuario, " +
       "integra lo ya dicho y cierra sin invitar a mantener un chat abierto. " +
-      "Mantente en un maximo aproximado de 350 palabras.",
+      "Ve directamente a lo nuevo, evita repetir la lectura inicial y " +
+      "mantente entre 140 y 220 palabras.",
     contextoPerfil ? `Contexto del perfil:\n${contextoPerfil}` : "",
     contextoConversacion ?
       `Contexto previo de la conversacion:\n${contextoConversacion}` :
@@ -266,7 +281,8 @@ async function obtenerPatronEmocional(
     onUsage,
 ) {
   const prompt =
-    "Analiza los siguientes registros de suenos y encuentra patrones " +
+    "Analiza los siguientes registros recientes de suenos y encuentra " +
+    "patrones " +
     "emocionales comunes. No lo presentes como diagnostico. Distingue entre " +
     "evidencias observadas, hipotesis posibles, cambios a lo largo del " +
     "periodo y preguntas de reflexion. Cita ejemplos concretos por fecha o " +
@@ -276,7 +292,7 @@ async function obtenerPatronEmocional(
     "registros solo permiten observar emociones o temas. Si los datos son " +
     "pocos, dilo con " +
     "claridad y baja la confianza de la lectura. Mantente en un maximo " +
-    "aproximado de 900 palabras.\n\n" +
+    "aproximado de 650 palabras.\n\n" +
     (periodo ? `Periodo analizado: ${periodo}\n\n` : "") +
     `${suenos.join("\n\n---\n\n")}`;
 

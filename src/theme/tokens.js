@@ -1,4 +1,4 @@
-export const colors = {
+export const lightColors = {
   background: '#F7F4EF',
   surface: '#FFFFFF',
   surfaceSoft: '#F1EEE8',
@@ -21,6 +21,38 @@ export const colors = {
   dangerSoft: '#FDECEA',
   white: '#FFFFFF',
 };
+
+export const darkColors = {
+  background: '#0B1320',
+  surface: '#131D2B',
+  surfaceSoft: '#192536',
+  ink: '#F4F1EA',
+  midnight: '#202D43',
+  muted: '#B2BDCC',
+  subtle: '#8793A5',
+  line: '#2A3547',
+  primary: '#9B8CF2',
+  primaryDark: '#B9AEFF',
+  primarySoft: '#282247',
+  lavender: '#C9C1F4',
+  warm: '#E3A07F',
+  warmSoft: '#34251F',
+  success: '#72C59A',
+  successSoft: '#173629',
+  warning: '#F4B45E',
+  warningSoft: '#392B18',
+  danger: '#FF8B83',
+  dangerSoft: '#3D211F',
+  white: '#FFFFFF',
+};
+
+export const themeColors = {
+  light: lightColors,
+  dark: darkColors,
+};
+
+// Compatibilidad temporal para utilidades que no renderizan interfaz.
+export const colors = lightColors;
 
 export const spacing = {
   xs: 4,

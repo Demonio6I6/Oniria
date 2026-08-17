@@ -1,9 +1,6 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../firebase/config';
+import { createProtectedCallable } from '../firebase/callable';
 
-const functions = getFunctions(app, 'europe-west1');
-const deleteUserAccountCallable = httpsCallable(
-  functions,
+const deleteUserAccountCallable = createProtectedCallable(
   'deleteUserAccountData',
   { timeout: 120000 }
 );

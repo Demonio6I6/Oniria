@@ -3,15 +3,16 @@ import {
   Image,
   ImageBackground,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from './AppIcon';
 
-const ONBOARDING_IMAGE = require('../../assets/3.jpeg');
+const ONBOARDING_IMAGE = require('../../assets/onboarding-hero-portrait.jpg');
 const ONBOARDING_MARK = require('../../assets/icon.png');
 
 const PAGES = [
@@ -50,22 +51,27 @@ export default function OnboardingScreen({ onFinish }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ImageBackground
-        source={ONBOARDING_IMAGE}
-        style={styles.background}
-        imageStyle={styles.backgroundImage}
-      >
-        <LinearGradient
-          colors={[
-            'rgba(3, 9, 20, 0.24)',
-            'rgba(3, 9, 20, 0.42)',
-            'rgba(3, 9, 20, 0.76)',
-          ]}
-          locations={[0, 0.48, 1]}
-          style={styles.scrim}
-        />
+    <ImageBackground
+      source={ONBOARDING_IMAGE}
+      resizeMode="cover"
+      style={styles.background}
+      imageStyle={styles.backgroundImage}
+    >
+      <StatusBar style="light" backgroundColor="#07111F" />
+      <LinearGradient
+        colors={[
+          'rgba(3, 9, 20, 0.24)',
+          'rgba(3, 9, 20, 0.42)',
+          'rgba(3, 9, 20, 0.76)',
+        ]}
+        locations={[0, 0.48, 1]}
+        style={styles.scrim}
+      />
 
+      <SafeAreaView
+        edges={['top', 'right', 'bottom', 'left']}
+        style={styles.safeArea}
+      >
         <View style={styles.topRow}>
           <View style={styles.brandRow}>
             <Image source={ONBOARDING_MARK} style={styles.brandMark} />
@@ -102,17 +108,17 @@ export default function OnboardingScreen({ onFinish }) {
             <AppIcon name="arrowRight" size={19} color="#111827" />
           </Pressable>
         </View>
-      </ImageBackground>
-    </SafeAreaView>
+      </SafeAreaView>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  background: {
     backgroundColor: '#07111F',
     flex: 1,
   },
-  background: {
+  safeArea: {
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 22,

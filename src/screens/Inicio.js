@@ -1,40 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../components/AppIcon';
 import { getDreamId, getDreamSummary, getDreamTimestamp } from '../domain/dreams';
-import { loadSavedDreams } from '../services/dreamRepository';
+import {
+  buildEmotionOverview,
+  sortEmotionData,
+} from '../domain/emotions';
+import {
+  loadSavedDreams,
+  subscribeToDreamRecords,
+} from '../services/dreamRepository';
+import { loadEmotionRecords } from '../services/emotionRepository';
 import { trackProductEvent } from '../services/productAnalytics';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
-import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
-const MONTHLY_PATTERN_GOAL = 10;
+const DEEP_PATTERN_GOAL = 6;
 
 const isSameMonth = (timestamp, comparisonDate) => {
   const date = new Date(timestamp);
   return date.getFullYear() === comparisonDate.getFullYear() &&
     date.getMonth() === comparisonDate.getMonth();
-};
-
-const getTopEmotion = dreams => {
-  const counts = {};
-
-  dreams.forEach(dream => {
-    const emotions = new Set(Array.isArray(dream?.emotions) ? dream.emotions : []);
-    emotions.forEach(emotion => {
-      counts[emotion] = (counts[emotion] || 0) + 1;
-    });
-  });
-
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))[0] || null;
 };
 
 const getGreeting = () => {
@@ -46,17 +41,22 @@ const getGreeting = () => {
 
 export default function Inicio({ navigation }) {
   const subscription = useSubscriptionAccess();
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const [dreams, setDreams] = useState([]);
+  const [emotionRecords, setEmotionRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadDashboard = async () => {
       try {
-        const [savedDreams] = await Promise.all([
+        const [savedDreams, savedEmotionRecords] = await Promise.all([
           loadSavedDreams(),
+          loadEmotionRecords(),
           subscription.refresh().catch(() => null),
         ]);
         setDreams(savedDreams);
+        setEmotionRecords(savedEmotionRecords);
       } catch (error) {
         console.error('Error cargando el inicio de Lunentra:', error);
       } finally {
@@ -66,7 +66,23 @@ export default function Inicio({ navigation }) {
 
     loadDashboard();
     const unsubscribe = navigation.addListener('focus', loadDashboard);
-    return unsubscribe;
+    const dreamSubscription = subscribeToDreamRecords(async () => {
+      try {
+        const [savedDreams, savedEmotionRecords] = await Promise.all([
+          loadSavedDreams(),
+          loadEmotionRecords(),
+        ]);
+        setDreams(savedDreams);
+        setEmotionRecords(savedEmotionRecords);
+      } catch (error) {
+        console.error('Error actualizando el inicio de Lunentra:', error);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      dreamSubscription.remove();
+    };
   }, [navigation, subscription.refresh]);
 
   const now = new Date();
@@ -74,17 +90,21 @@ export default function Inicio({ navigation }) {
     isSameMonth(getDreamTimestamp(dream), now)
   );
   const latestDream = dreams[0] || null;
-  const topEmotion = useMemo(
-    () => getTopEmotion(dreamsThisMonth),
-    [dreamsThisMonth]
-  );
+  const emotionSummary = useMemo(() => {
+    const overview = buildEmotionOverview(emotionRecords, dreams);
+    const dominantEmotion = [...overview.chartData]
+      .filter(item => item.count > 0)
+      .sort(sortEmotionData)[0] || null;
+
+    return { dominantEmotion, totalDreams: overview.totalDreams };
+  }, [dreams, emotionRecords]);
+  const topEmotion = emotionSummary.dominantEmotion;
   const progressValue = Math.min(
-    dreamsThisMonth.length / MONTHLY_PATTERN_GOAL,
+    dreams.length / DEEP_PATTERN_GOAL,
     1
   );
-  const remainingDreams = Math.max(MONTHLY_PATTERN_GOAL - dreamsThisMonth.length, 0);
-  const monthLabel = now.toLocaleDateString('es-ES', { month: 'long' });
-  const hasMonthlyGoal = dreamsThisMonth.length >= MONTHLY_PATTERN_GOAL;
+  const remainingDreams = Math.max(DEEP_PATTERN_GOAL - dreams.length, 0);
+  const hasDeepPatternGoal = dreams.length >= DEEP_PATTERN_GOAL;
 
   if (loading) {
     return (
@@ -95,7 +115,7 @@ export default function Inicio({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.screen}>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.container}
@@ -133,7 +153,7 @@ export default function Inicio({ navigation }) {
         accessibilityLabel="Registrar un sueño"
       >
         <View style={styles.captureIcon}>
-          <AppIcon name="plus" size={22} color={colors.midnight} />
+          <AppIcon name="plus" size={22} color={colors.primary} />
         </View>
         <View style={styles.captureCopy}>
           <Text style={styles.captureTitle}>Registrar un sueño</Text>
@@ -145,11 +165,11 @@ export default function Inicio({ navigation }) {
       <View style={styles.journeySection}>
         <View style={styles.sectionHeadingRow}>
           <View>
-            <Text style={styles.eyebrow}>TU RECORRIDO EN {monthLabel.toUpperCase()}</Text>
-            <Text style={styles.sectionTitle}>Lectura profunda del mes</Text>
+            <Text style={styles.eyebrow}>TU RECORRIDO</Text>
+            <Text style={styles.sectionTitle}>Lectura profunda de patrones</Text>
           </View>
           <Text style={styles.progressCount}>
-            {dreamsThisMonth.length}/{MONTHLY_PATTERN_GOAL}
+            {Math.min(dreams.length, DEEP_PATTERN_GOAL)}/{DEEP_PATTERN_GOAL}
           </Text>
         </View>
 
@@ -160,14 +180,14 @@ export default function Inicio({ navigation }) {
         </View>
 
         <Text style={styles.journeyText}>
-          {hasMonthlyGoal
-            ? 'Ya tienes suficiente contexto para explorar los patrones del mes.'
-            : remainingDreams === MONTHLY_PATTERN_GOAL
+          {hasDeepPatternGoal
+            ? 'Ya tienes suficiente contexto para explorar patrones más profundos.'
+            : remainingDreams === DEEP_PATTERN_GOAL
               ? 'Cada nuevo registro añadirá una pieza a tu historia.'
-              : `Te faltan ${remainingDreams} ${remainingDreams === 1 ? 'registro' : 'registros'} para activar tu lectura mensual.`}
+              : `Te faltan ${remainingDreams} ${remainingDreams === 1 ? 'registro' : 'registros'} para activar tu lectura profunda.`}
         </Text>
 
-        {hasMonthlyGoal ? (
+        {hasDeepPatternGoal ? (
           <TouchableOpacity
             style={styles.inlineAction}
             onPress={() => navigation.navigate('DiagramaEmocional')}
@@ -184,10 +204,13 @@ export default function Inicio({ navigation }) {
             <AppIcon name="chart" size={20} color={colors.primary} />
           </View>
           <View style={styles.insightCopy}>
-            <Text style={styles.eyebrow}>UN INDICIO RECIENTE</Text>
+            <Text style={styles.eyebrow}>UN PATRÓN DE TU HISTORIAL</Text>
             <Text style={styles.insightText}>
-              <Text style={styles.insightStrong}>{topEmotion[0]}</Text> aparece en{' '}
-              {topEmotion[1]} {topEmotion[1] === 1 ? 'sueño' : 'sueños'} este mes.
+              <Text style={styles.insightStrong}>
+                {topEmotion.label.charAt(0).toUpperCase() + topEmotion.label.slice(1)}
+              </Text>{' '}
+              aparece en {topEmotion.count} de {emotionSummary.totalDreams}{' '}
+              sueños con emociones reconocidas.
             </Text>
             <Text style={styles.insightNote}>
               Es una señal orientativa, no una conclusión sobre ti.
@@ -255,7 +278,7 @@ export default function Inicio({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   screen: {
     backgroundColor: colors.background,
     flex: 1,
@@ -318,7 +341,7 @@ const styles = StyleSheet.create({
   },
   captureIcon: {
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 13,
     height: 46,
     justifyContent: 'center',
@@ -409,7 +432,7 @@ const styles = StyleSheet.create({
   },
   insightIcon: {
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 11,
     height: 40,
     justifyContent: 'center',

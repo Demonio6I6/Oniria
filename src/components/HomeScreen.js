@@ -22,7 +22,8 @@ import Inicio from '../screens/Inicio';
 import AppIcon from './AppIcon';
 import OnboardingScreen from './OnboardingScreen';
 import { trackProductEvent } from '../services/productAnalytics';
-import { colors, radii, spacing } from '../theme/tokens';
+import { radii, spacing } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const AUTH_METHODS = {
   EMAIL: 'email',
@@ -60,7 +61,8 @@ function getAuthErrorMessage(error) {
 }
 
 function AuthMethodIcon({ type, active }) {
-  const iconColor = active ? '#fff' : '#4F46E5';
+  const { colors } = useAppTheme();
+  const iconColor = active ? colors.white : colors.primary;
 
   const iconNameByType = {
     google: 'google',
@@ -88,6 +90,9 @@ function AuthMethodButton({
   expandable,
   onPress,
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -116,18 +121,21 @@ function AuthMethodButton({
         </Text>
       </View>
       {loading ? (
-        <ActivityIndicator color={active ? '#fff' : '#4F46E5'} size="small" />
+        <ActivityIndicator
+          color={active ? colors.white : colors.primary}
+          size="small"
+        />
       ) : expandable ? (
         <AppIcon
           name={active ? 'chevronUp' : 'chevronDown'}
           size={19}
-          color={active ? '#fff' : '#64748B'}
+          color={active ? colors.white : colors.muted}
         />
       ) : (
         <AppIcon
           name="arrowRight"
           size={19}
-          color={active ? '#fff' : '#64748B'}
+          color={active ? colors.white : colors.muted}
         />
       )}
     </Pressable>
@@ -135,6 +143,9 @@ function AuthMethodButton({
 }
 
 function AuthFeedback({ message, errorMessage }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+
   if (!message && !errorMessage) return null;
 
   const isError = Boolean(errorMessage);
@@ -144,7 +155,7 @@ function AuthFeedback({ message, errorMessage }) {
       <AppIcon
         name={isError ? 'alertCircle' : 'checkCircle'}
         size={18}
-        color={isError ? '#B91C1C' : '#047857'}
+        color={isError ? colors.danger : colors.success}
       />
       <Text style={[styles.feedbackText, isError && styles.feedbackTextError]}>
         {errorMessage || message}
@@ -169,6 +180,8 @@ export default function HomeScreen({
   heroTitle = 'Conócete a través de lo que sueñas.',
   heroText = 'Registra tus sueños, explora posibles significados y reconoce patrones con el tiempo.',
 }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busyAction, setBusyAction] = useState(null);
@@ -329,7 +342,7 @@ export default function HomeScreen({
             </View>
 
             <View style={styles.valueNote}>
-              <AppIcon name="info" size={18} color="#4338CA" />
+              <AppIcon name="info" size={18} color={colors.primary} />
               <Text style={styles.valueNoteText}>
                 Lunentra no adivina ni diagnostica. Te ayuda a observar y
                 reflexionar sobre tu propia experiencia.
@@ -365,7 +378,7 @@ export default function HomeScreen({
                       autoCorrect={false}
                       keyboardType="email-address"
                       placeholder="correo@ejemplo.com"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={colors.subtle}
                       style={styles.input}
                     />
                     <TextInput
@@ -373,7 +386,7 @@ export default function HomeScreen({
                       onChangeText={setPassword}
                       secureTextEntry
                       placeholder="Contrasena"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={colors.subtle}
                       style={styles.input}
                     />
                     <View style={styles.row}>
@@ -391,7 +404,7 @@ export default function HomeScreen({
                         }
                       >
                         {busyAction === 'emailSignIn' ? (
-                          <ActivityIndicator color="#fff" size="small" />
+                          <ActivityIndicator color={colors.white} size="small" />
                         ) : (
                           <Text style={styles.actionButtonText}>Entrar</Text>
                         )}
@@ -410,7 +423,7 @@ export default function HomeScreen({
                         }
                       >
                         {busyAction === 'emailRegister' ? (
-                          <ActivityIndicator color="#4F46E5" size="small" />
+                          <ActivityIndicator color={colors.primary} size="small" />
                         ) : (
                           <Text style={styles.outlineActionButtonText}>
                             Crear cuenta
@@ -430,7 +443,7 @@ export default function HomeScreen({
                       style={styles.linkButton}
                     >
                       {busyAction === 'resetPassword' ? (
-                        <ActivityIndicator color="#4F46E5" size="small" />
+                        <ActivityIndicator color={colors.primary} size="small" />
                       ) : (
                         <Text
                           style={[
@@ -474,7 +487,7 @@ export default function HomeScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   onboardingLoader: {
     alignItems: 'center',
     backgroundColor: '#07111F',
@@ -589,13 +602,13 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   methodGroup: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: radii.md,
     overflow: 'hidden',
   },
   methodButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.md,
     borderWidth: 1,
@@ -635,7 +648,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   methodTitleActive: {
-    color: '#fff',
+    color: colors.white,
   },
   methodDescription: {
     color: colors.muted,
@@ -647,7 +660,7 @@ const styles = StyleSheet.create({
     color: '#DDE7FF',
   },
   expandedContent: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderBottomColor: colors.line,
     borderBottomLeftRadius: radii.md,
     borderBottomRightRadius: radii.md,
@@ -685,14 +698,14 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   actionButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 14,
     fontWeight: '800',
     textAlign: 'center',
   },
   outlineActionButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderColor: colors.primary,
     borderRadius: radii.md,
     borderWidth: 1,
@@ -726,8 +739,8 @@ const styles = StyleSheet.create({
   },
   feedbackBox: {
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    backgroundColor: colors.successSoft,
+    borderColor: colors.success,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
@@ -737,16 +750,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   feedbackBoxError: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.danger,
   },
   feedbackText: {
     flex: 1,
-    color: '#047857',
+    color: colors.success,
     fontSize: 13,
     lineHeight: 18,
   },
   feedbackTextError: {
-    color: '#B91C1C',
+    color: colors.danger,
   },
 });

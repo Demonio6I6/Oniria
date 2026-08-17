@@ -10,6 +10,11 @@ export const FIXED_EMOTIONS = [
   'esperanza',
 ];
 
+export const sortEmotionData = (a, b) =>
+  b.value - a.value ||
+  (b.count || 0) - (a.count || 0) ||
+  a.label.localeCompare(b.label, 'es');
+
 const EMOTION_ALIASES = {
   alegria: 'alegría',
   felicidad: 'alegría',
@@ -106,4 +111,11 @@ export const buildEmotionChartData = (records) => {
   });
 
   return { chartData, totalDreams };
+};
+
+export const buildEmotionOverview = (legacyRecords, dreams) => {
+  const dreamRecords = buildEmotionRecordsFromDreams(dreams);
+  const records = mergeEmotionRecords(legacyRecords, dreamRecords);
+
+  return buildEmotionChartData(records);
 };

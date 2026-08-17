@@ -1,11 +1,7 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../firebase/config';
-
-const REGION = 'europe-west1';
-const functions = getFunctions(app, REGION);
+import { createProtectedCallable } from '../firebase/callable';
 
 export const deleteAnonymousAccountData = async () => {
-  const callable = httpsCallable(functions, 'deleteAnonymousUserData', {
+  const callable = createProtectedCallable('deleteAnonymousUserData', {
     timeout: 120000,
   });
 

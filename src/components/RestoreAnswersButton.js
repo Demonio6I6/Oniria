@@ -3,9 +3,11 @@ import React, { useContext } from 'react';
 import { Alert, TouchableOpacity } from 'react-native';
 import { GlobalContext } from '../GlobalContext';
 import AppIcon from './AppIcon';
+import { useAppTheme } from '../theme/ThemeContext';
 
 export default function RestoreAnswersButton() {
   const { clearRespuestas } = useContext(GlobalContext);
+  const { colors } = useAppTheme();
 
   const handlePress = () => {
     Alert.alert(
@@ -25,7 +27,7 @@ export default function RestoreAnswersButton() {
       onPress={handlePress}
       style={{ marginRight: 10, padding: 8 }}
     >
-      <AppIcon name="eraser" size={22} color="black" />
+      <AppIcon name="eraser" size={22} color={colors.ink} />
     </TouchableOpacity>
   );
 }

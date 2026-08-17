@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+} from '@react-navigation/native';
 import { View, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import Perfil from '../screens/Perfil';
 import SuenosGuardados from '../screens/SuenosGuardados';
@@ -14,7 +18,7 @@ import RestoreAnswersButton from '../components/RestoreAnswersButton';
 import AppIcon from '../components/AppIcon';
 import BottomNavigation from '../components/BottomNavigation';
 import { navigationRef } from '../utils/navigationRef';
-import { colors } from '../theme/tokens';
+import { useAppTheme } from '../theme/ThemeContext';
 
 const Stack = createStackNavigator();
 const ROOT_TAB_ROUTES = new Set([
@@ -34,11 +38,27 @@ export default function StackNavigator({
   signOut,
   showInfo,
   showInfoInterpretation,
-  confirmNewInterpretation,
   enableNotifications,
   deleteAccount,
 }) {
   const [currentRoute, setCurrentRoute] = useState('Home');
+  const { colors, isDark } = useAppTheme();
+  const navigationTheme = useMemo(() => {
+    const baseTheme = isDark ? DarkTheme : DefaultTheme;
+
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        background: colors.background,
+        border: colors.line,
+        card: colors.background,
+        notification: colors.danger,
+        primary: colors.primary,
+        text: colors.ink,
+      },
+    };
+  }, [colors, isDark]);
 
   const updateCurrentRoute = () => {
     const routeName = navigationRef.getCurrentRoute()?.name;
@@ -54,6 +74,7 @@ export default function StackNavigator({
     <View style={{ flex: 1 }}>
       <NavigationContainer
         ref={navigationRef}
+        theme={navigationTheme}
         onReady={updateCurrentRoute}
         onStateChange={updateCurrentRoute}
       >
@@ -102,18 +123,11 @@ export default function StackNavigator({
             headerRight: () => (
               <View style={{ flexDirection: 'row' }}>
                 <TouchableOpacity
-                  onPress={confirmNewInterpretation}
-                  accessibilityLabel="Empezar una nueva interpretación"
-                  style={{ marginRight: 6, padding: 8 }}
-                >
-                  <AppIcon name="plusCircle" size={22} color={colors.ink} />
-                </TouchableOpacity>
-                <TouchableOpacity
                   onPress={showInfoInterpretation}
                   accessibilityLabel="Información de la lectura"
                   style={{ marginRight: 10, padding: 8 }}
                 >
-                  <AppIcon name="info" size={22} color="black" />
+                  <AppIcon name="info" size={22} color={colors.ink} />
                 </TouchableOpacity>
               </View>
             ),
@@ -128,7 +142,7 @@ export default function StackNavigator({
               <View style={{ flexDirection: 'row' }}>
                 <RestoreAnswersButton />
                 <TouchableOpacity onPress={showInfo} style={{ marginRight: 10, padding: 8 }}>
-                  <AppIcon name="info" size={24} color="black" />
+                  <AppIcon name="info" size={24} color={colors.ink} />
                 </TouchableOpacity>
               </View>
             ),
@@ -148,11 +162,10 @@ export default function StackNavigator({
           component={SuenosGuardados}
           options={({ route }) => {
             const selectionMode = route.params?.selectionMode;
+            const hasDreams = route.params?.hasDreams;
 
-            // Header para modo normal (no selección)
-            const renderNormalHeader = () => (
+            const renderNormalHeader = () => hasDreams ? (
               <View style={{ flexDirection: 'row' }}>
-                {/* Botón de calendario */}
                 <TouchableOpacity
                   onPress={() => DeviceEventEmitter.emit('enableSelectionMode')}
                   accessibilityLabel="Seleccionar sueños para borrar"
@@ -161,7 +174,7 @@ export default function StackNavigator({
                   <AppIcon name="trash" size={22} color={colors.muted} />
                 </TouchableOpacity>
               </View>
-            );
+            ) : null;
 
             // Header para modo selección
             const renderSelectionHeader = () => (
@@ -230,7 +243,7 @@ export default function StackNavigator({
         />
         <Stack.Screen
           name="Configuracion"
-          options={{ title: 'Privacidad y control' }}
+          options={{ title: 'Configuración' }}
         >
           {props => (
             <Configuracion

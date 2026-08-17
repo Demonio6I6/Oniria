@@ -20,6 +20,7 @@ import {
   obtenerEmocionesDesdeContexto,
 } from '../../openai';
 import Markdown from 'react-native-markdown-display';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppIcon from '../components/AppIcon';
 import ReportAiContentButton from '../components/ReportAiContentButton';
 import { GlobalContext } from '../GlobalContext';
@@ -28,14 +29,18 @@ import {
   buildProfileSnapshot,
 } from '../domain/profile';
 import {
+  buildPreviousDreamContext,
   buildDreamConversation,
   buildFullDreamInterpretation,
   createDreamId,
   createFallbackSummary,
   formatDateKey,
+  getDreamTimestamp,
+  getPreviousRecentDream,
   normalizeDreamEmotions,
 } from '../domain/dreams';
 import {
+  loadSavedDreams,
   saveDreamRecord,
   updateDreamRecordById,
 } from '../services/dreamRepository';
@@ -46,7 +51,8 @@ import {
 } from '../services/privacyRepository';
 import { useSubscriptionAccess } from '../subscriptions/SubscriptionContext';
 import { trackProductEvent } from '../services/productAnalytics';
-import { colors, radii, spacing, typography } from '../theme/tokens';
+import { radii, spacing, typography } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 function AssistantMessage({ text, markdownStyle }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -73,6 +79,7 @@ const TYPING_DOTS = Array.from({ length: TYPING_DOT_COUNT }, (_, index) => ({
 }));
 
 function LoadingSpinner() {
+  const styles = useThemeStyles(createStyles);
   const dotAnims = useRef(
     TYPING_DOTS.map(() => new Animated.Value(0))
   ).current;
@@ -207,7 +214,7 @@ const guardarRegistroSueno = async ({
       personalReflection: '',
       resonance: '',
       interactionStatus: 'follow_up_available',
-      promptVersion: 'dream_consultant_v2',
+      promptVersion: 'dream_consultant_v3',
       timestamp,
       createdAt: timestamp,
       dateKey,
@@ -333,7 +340,7 @@ const confirmarPrivacidadIA = async () => {
   return new Promise(resolve => {
     Alert.alert(
       'Privacidad de la interpretacion',
-      'Para interpretar tu sueno se enviara el texto del sueno y las respuestas de tu perfil a nuestro servidor y al proveedor de IA. No se usa como diagnostico clinico.',
+      'Para interpretar tu sueño se enviarán su texto, las respuestas de tu perfil y, si existe, el contexto confirmado de tu sueño anterior reciente a nuestro servidor y al proveedor de IA. No se usa como diagnóstico clínico.',
       [
         {
           text: 'Cancelar',
@@ -377,10 +384,9 @@ const formatRetryAt = (retryAt) => {
   const date = new Date(retryAt);
   if (Number.isNaN(date.getTime())) return '';
 
-  return date.toLocaleString([], {
-    weekday: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
+  return date.toLocaleDateString([], {
+    day: 'numeric',
+    month: 'long',
   });
 };
 
@@ -410,23 +416,14 @@ const buildInterpretationErrorMessage = (error, isInitialInteraction) => {
     }
 
     if (details.reason === 'premium-monthly-limit') {
-      return 'Ya usaste las lecturas Premium incluidas este mes.';
-    }
-
-    if (details.reason === 'premium-daily-limit') {
       const retryAt = details.retryAt || details.retryAtMillis;
       const formattedRetryAt = formatRetryAt(retryAt);
       return formattedRetryAt
-        ? `Alcanzaste el límite operativo de hoy. Disponible de nuevo ${formattedRetryAt}.`
-        : 'Alcanzaste el límite operativo de lecturas Premium de hoy.';
+        ? `Ya usaste las lecturas Premium de este mes. Tus 15 lecturas se renuevan el ${formattedRetryAt}.`
+        : 'Ya usaste las lecturas Premium incluidas este mes.';
     }
 
-    const retryAt = details.retryAt || details.retryAtMillis;
-    const formattedRetryAt = formatRetryAt(retryAt);
-
-    return formattedRetryAt
-      ? `Ya usaste tu interpretacion disponible. Podras pedir otra a partir de ${formattedRetryAt}.`
-      : 'Ya usaste tu interpretacion disponible por hoy. Podras pedir otra mas adelante.';
+    return 'No hay una lectura disponible para esta solicitud.';
   }
 
   if (code === 'resource-exhausted') {
@@ -450,6 +447,9 @@ const getPaywallReasonFromError = (error) => {
 };
 
 export default function MainScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const { respuestas } = useContext(GlobalContext);
   const subscription = useSubscriptionAccess();
   const [descripcion, setDescripcion] = useState('');
@@ -473,29 +473,7 @@ export default function MainScreen({ navigation, route }) {
 
   const scrollViewRef = useRef(null);
 
-  const reiniciarInterpretacion = () => {
-    setMessages([]);
-    setInteractionStep(INTERACTION_STEPS.INITIAL);
-    setActiveDream(null);
-    setFollowUpInputVisible(false);
-    setDescripcion('');
-    setInputHeight(50);
-    setWakingEmotion('');
-    setWakingContext('');
-    setReflectionDraft('');
-    setResonance('');
-    setReflectionStatus('');
-    setSavedWithoutAi(false);
-    setSourceManualDreamId('');
-    setSourceManualDreamTimestamp(0);
-    setOptionalContextVisible(false);
-    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-  };
-
   useEffect(() => {
-    const newInterpretationSubscription = DeviceEventEmitter.addListener('newInterpretation', () => {
-      reiniciarInterpretacion();
-    });
     const accountConversionSubscription = DeviceEventEmitter.addListener(
       'accountConversionCompleted',
       event => {
@@ -511,7 +489,6 @@ export default function MainScreen({ navigation, route }) {
     );
 
     return () => {
-      newInterpretationSubscription.remove();
       accountConversionSubscription.remove();
     };
   }, [subscription.refresh]);
@@ -565,7 +542,7 @@ export default function MainScreen({ navigation, route }) {
         Alert.alert(
           'Lectura no disponible',
           retryLabel
-            ? `Podrás volver a usar una lectura ${retryLabel}.`
+            ? `Tus lecturas se renuevan el ${retryLabel}.`
             : 'Has alcanzado el límite de lecturas disponible para tu plan.'
         );
         return;
@@ -612,6 +589,31 @@ export default function MainScreen({ navigation, route }) {
           ? `Asociacion personal del usuario con su vida actual: ${wakingContext.trim()}`
           : '',
       ].filter(Boolean).join('\n\n');
+      let contextoReciente = '';
+      let previousDreamAgeDays = null;
+
+      if (esPrimeraInteraccion) {
+        try {
+          const suenosGuardados = await loadSavedDreams();
+          const suenoAnterior = getPreviousRecentDream(suenosGuardados, {
+            currentDreamId: sourceManualDreamId,
+            currentTimestamp: initialTimestamp,
+          });
+
+          contextoReciente = buildPreviousDreamContext(suenoAnterior);
+          if (suenoAnterior) {
+            previousDreamAgeDays = Math.floor(
+              (initialTimestamp - getDreamTimestamp(suenoAnterior)) /
+                (24 * 60 * 60 * 1000)
+            );
+          }
+        } catch (contextError) {
+          console.warn(
+            'No se pudo cargar el contexto del sueño anterior:',
+            contextError
+          );
+        }
+      }
       const contextoConversacion = mensajesPrevios
         .map(msg => `${msg.role}: ${msg.text}`)
         .join('\n');
@@ -620,6 +622,7 @@ export default function MainScreen({ navigation, route }) {
         resultado = await obtenerInterpretacionSueno(
           currentDescription,
           contextoPerfil,
+          contextoReciente,
           dreamSessionId
         );
       } else {
@@ -666,6 +669,8 @@ export default function MainScreen({ navigation, route }) {
         trackProductEvent('dream_interpretation_completed', {
           accountType: subscription.isGuest ? 'guest' :
             subscription.isPremium ? 'premium' : 'free',
+          recentContextUsed: Boolean(contextoReciente),
+          previousDreamAgeDays: previousDreamAgeDays ?? -1,
         });
         if (subscription.isGuest) {
           trackProductEvent('guest_demo_completed');
@@ -864,10 +869,17 @@ export default function MainScreen({ navigation, route }) {
   );
   const interpretationAvailabilityLabel = interpretationRetryLabel &&
     !initialPaywallReason
-    ? `${interpretationRemaining} lecturas restantes · disponible ${interpretationRetryLabel}`
+    ? `${interpretationRemaining} de ${interpretationLimit} lecturas · se renuevan el ${interpretationRetryLabel}`
     : subscription.isPremium
       ? `${interpretationRemaining} de ${interpretationLimit} lecturas Premium disponibles este mes`
       : `${interpretationRemaining} de ${interpretationLimit} lecturas de IA disponibles`;
+  const savedDreamAvailabilityText = savedWithoutAi
+    ? 'Podrás interpretarlo más adelante desde Mi diario.'
+    : interpretationRetryLabel
+      ? `Tus lecturas se renuevan el ${interpretationRetryLabel}. Mientras tanto, puedes guardar otros sueños sin usar IA.`
+      : initialPaywallReason
+        ? 'Puedes seguir guardando nuevos sueños sin usar IA.'
+        : 'Si recuerdas otro sueño, podrás guardarlo desde la opción Registrar.';
 
   const getUserMessageLabel = (messageIndex) => {
     if (!activeDream) return 'Tu sueño';
@@ -937,14 +949,14 @@ export default function MainScreen({ navigation, route }) {
               ? 'Anota lo que recuerdas: lugares, personas, emociones, símbolos o cualquier detalle extraño.'
               : 'Pregunta por un símbolo, una emoción o una escena concreta.'
           }
-          placeholderTextColor="#8A8A8A"
+          placeholderTextColor={colors.subtle}
           value={descripcion}
           onChangeText={setDescripcion}
           multiline
           editable={!cargando}
           onContentSizeChange={handleContentSizeChange}
           scrollEnabled={composerHeight >= maxHeight}
-          selectionColor="black"
+          selectionColor={colors.primary}
           textAlignVertical="top"
         />
         {isInitialComposer ? (
@@ -1007,7 +1019,7 @@ export default function MainScreen({ navigation, route }) {
               value={wakingContext}
               onChangeText={setWakingContext}
               placeholder="¿Hay algo de tu vida actual que relaciones con este sueño? (opcional)"
-              placeholderTextColor="#8A8A8A"
+              placeholderTextColor={colors.subtle}
               multiline
               textAlignVertical="top"
             />
@@ -1022,7 +1034,7 @@ export default function MainScreen({ navigation, route }) {
           disabled={aiActionDisabled}
         >
           <Text style={styles.primaryActionText}>{aiActionLabel}</Text>
-          <AppIcon name="send" size={19} color="#fff" />
+          <AppIcon name="send" size={19} color={colors.white} />
         </TouchableOpacity>
         {isInitialComposer ? (
           <TouchableOpacity
@@ -1051,6 +1063,7 @@ export default function MainScreen({ navigation, route }) {
           contentContainerStyle={[
             styles.messagesContent,
             { flexGrow: 1 },
+            { paddingBottom: spacing.xl + insets.bottom },
             mostrarIntroInicial ? styles.initialMessagesContent : {},
           ]}
           keyboardShouldPersistTaps="always"
@@ -1111,6 +1124,15 @@ export default function MainScreen({ navigation, route }) {
           {mostrarComposerInicial && messages.length > 0 &&
             renderDreamComposer(INTERACTION_STEPS.INITIAL)}
 
+          {activeDream && esPasoAmpliacion && !cargando ? (
+            <View style={styles.savedBanner}>
+              <AppIcon name="checkCircle" size={18} color={colors.success} />
+              <Text style={styles.savedBannerText}>
+                Tu sueño ya está guardado en Mi diario.
+              </Text>
+            </View>
+          ) : null}
+
           {activeDream && !cargando && !esPasoInicial && !savedWithoutAi ? (
             <View style={styles.reflectionCard}>
               <Text style={styles.reflectionEyebrow}>TU VOZ IMPORTA</Text>
@@ -1159,7 +1181,7 @@ export default function MainScreen({ navigation, route }) {
                 }}
                 style={styles.reflectionInput}
                 placeholder="Escribe una conclusión, una pregunta o algo que quieras recordar."
-                placeholderTextColor="#8A8A8A"
+                placeholderTextColor={colors.subtle}
                 multiline
                 textAlignVertical="top"
               />
@@ -1220,19 +1242,34 @@ export default function MainScreen({ navigation, route }) {
 
           {cicloCerrado && (
             <View style={styles.closedNotice}>
+              <View style={styles.closedNoticeIcon}>
+                <AppIcon name="checkCircle" size={24} color={colors.success} />
+              </View>
+              <Text style={styles.closedNoticeTitle}>
+                Tu sueño se guardó correctamente
+              </Text>
               <Text style={styles.closedNoticeText}>
                 {savedWithoutAi
-                  ? 'Registro guardado sin usar una lectura de IA.'
-                  : 'Registro guardado con la lectura y tu ampliación.'}
+                  ? 'Quedó guardado en tu diario sin usar una lectura de IA.'
+                  : 'El sueño, la lectura y tu ampliación quedaron guardados en Mi diario.'}
+              </Text>
+              <Text style={styles.closedNoticeHint}>
+                {savedDreamAvailabilityText}
               </Text>
               <TouchableOpacity
-                style={styles.newDreamButton}
-                onPress={reiniciarInterpretacion}
+                style={styles.journalButton}
+                onPress={() => navigation.navigate('SuenosGuardados')}
               >
-                <AppIcon name="plusCircle" size={18} color="#fff" />
-                <Text style={styles.newDreamButtonText}>
-                  Registrar otro sueño
+                <AppIcon name="bookmark" size={18} color={colors.white} />
+                <Text style={styles.journalButtonText}>
+                  Ver en Mi diario
                 </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.homeButton}
+                onPress={() => navigation.navigate('Home')}
+              >
+                <Text style={styles.homeButtonText}>Volver al inicio</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1249,7 +1286,7 @@ export default function MainScreen({ navigation, route }) {
                 <Text style={styles.followUpButtonText}>
                   Profundizar
                 </Text>
-                <AppIcon name="arrowRight" size={18} color="#fff" />
+                <AppIcon name="arrowRight" size={18} color={colors.white} />
               </TouchableOpacity>
             </View>
           )}
@@ -1262,7 +1299,7 @@ export default function MainScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -1323,7 +1360,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   usageBannerText: {
-    color: '#6366F1',
+    color: colors.primary,
     fontSize: 11,
     lineHeight: 16,
     marginTop: 2,
@@ -1439,7 +1476,7 @@ const styles = StyleSheet.create({
     opacity: 0.35,
   },
   primaryActionText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 15,
     fontWeight: '700',
     marginRight: 8,
@@ -1502,6 +1539,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 4,
   },
+  savedBanner: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radii.md,
+    flexDirection: 'row',
+    marginBottom: spacing.lg,
+    maxWidth: 520,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    width: '100%',
+  },
+  savedBannerText: {
+    color: colors.success,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: spacing.sm,
+  },
   reflectionCard: {
     alignSelf: 'center',
     backgroundColor: colors.warmSoft,
@@ -1549,12 +1605,12 @@ const styles = StyleSheet.create({
     borderColor: colors.warm,
   },
   resonanceButtonText: {
-    color: '#475569',
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '700',
   },
   resonanceButtonTextSelected: {
-    color: '#fff',
+    color: colors.white,
   },
   reflectionInput: {
     backgroundColor: colors.surface,
@@ -1582,17 +1638,17 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   saveReflectionButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 13,
     fontWeight: '800',
   },
   reflectionSuccess: {
-    color: '#047857',
+    color: colors.success,
     fontSize: 12,
     marginTop: 9,
   },
   reflectionError: {
-    color: '#B91C1C',
+    color: colors.danger,
     fontSize: 12,
     marginTop: 9,
   },
@@ -1633,7 +1689,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   typingDot: {
-    backgroundColor: '#333',
+    backgroundColor: colors.muted,
     borderRadius: TYPING_DOT_SIZE / 2,
     height: TYPING_DOT_SIZE,
     marginHorizontal: 3,
@@ -1641,28 +1697,71 @@ const styles = StyleSheet.create({
   },
   closedNotice: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 12,
+    alignSelf: 'center',
+    backgroundColor: colors.successSoft,
+    borderRadius: radii.lg,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+    maxWidth: 520,
+    padding: spacing.xl,
+    width: '100%',
   },
-  closedNoticeText: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 10,
+  closedNoticeIcon: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  closedNoticeTitle: {
+    color: colors.ink,
+    fontSize: 19,
+    fontWeight: '800',
+    marginTop: spacing.md,
     textAlign: 'center',
   },
-  newDreamButton: {
-    flexDirection: 'row',
+  closedNoticeText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  closedNoticeHint: {
+    color: colors.success,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  journalButton: {
     alignItems: 'center',
     backgroundColor: colors.midnight,
     borderRadius: radii.md,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    minHeight: 48,
+    paddingHorizontal: spacing.lg,
   },
-  newDreamButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
+  journalButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '800',
+    marginLeft: spacing.sm,
+  },
+  homeButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    minHeight: 42,
+    paddingHorizontal: spacing.lg,
+  },
+  homeButtonText: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '800',
   },
   followUpPrompt: {
     alignItems: 'center',
@@ -1673,7 +1772,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   followUpPromptTitle: {
-    color: '#555',
+    color: colors.muted,
     fontSize: 14,
     marginBottom: 10,
     textAlign: 'center',
@@ -1688,7 +1787,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   followUpButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 15,
     fontWeight: '700',
     marginRight: 8,

@@ -1,9 +1,6 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../firebase/config';
+import { createProtectedCallable } from '../firebase/callable';
 
-const functions = getFunctions(app, 'europe-west1');
-const reportAiContentCallable = httpsCallable(
-  functions,
+const reportAiContentCallable = createProtectedCallable(
   'reportAiContent',
   { timeout: 15000 }
 );

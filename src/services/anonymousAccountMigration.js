@@ -1,10 +1,6 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { app } from '../firebase/config';
+import { createProtectedCallable } from '../firebase/callable';
 
-const REGION = 'europe-west1';
-const functions = getFunctions(app, REGION);
-const migrateAnonymousServerStateCallable = httpsCallable(
-  functions,
+const migrateAnonymousServerStateCallable = createProtectedCallable(
   'migrateAnonymousServerState',
   { timeout: 120000 }
 );

@@ -12,8 +12,11 @@ import {
 import { navigationRef } from '../utils/navigationRef';
 import AppIcon from './AppIcon';
 import { trackProductEvent } from '../services/productAnalytics';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-10)).current;
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -125,7 +128,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('Home')}
           >
-            <AppIcon name="moon" size={20} />
+            <AppIcon name="moon" size={20} color={colors.ink} />
             <Text style={styles.menuText}>Inicio</Text>
           </TouchableOpacity>
 
@@ -133,7 +136,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('Perfil')}
           >
-            <AppIcon name="profile" size={20} />
+            <AppIcon name="profile" size={20} color={colors.ink} />
             <Text style={styles.menuText}>Mi contexto</Text>
           </TouchableOpacity>
 
@@ -142,7 +145,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
               style={styles.menuItem}
               onPress={() => handleNavigate('Cuenta')}
             >
-              <AppIcon name="personAdd" size={20} />
+              <AppIcon name="personAdd" size={20} color={colors.ink} />
               <Text style={styles.menuText}>Crear cuenta</Text>
             </TouchableOpacity>
           ) : null}
@@ -151,7 +154,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('SuenosGuardados')}
           >
-            <AppIcon name="bookmark" size={20} />
+            <AppIcon name="bookmark" size={20} color={colors.ink} />
             <Text style={styles.menuText}>Mi diario</Text>
           </TouchableOpacity>
 
@@ -159,7 +162,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('DiagramaEmocional')}
           >
-            <AppIcon name="chart" size={20} />
+            <AppIcon name="chart" size={20} color={colors.ink} />
             <Text style={styles.menuText}>Mis patrones</Text>
           </TouchableOpacity>
 
@@ -167,15 +170,15 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             style={styles.menuItem}
             onPress={() => handleNavigate('Configuracion')}
           >
-            <AppIcon name="shield" size={20} />
-            <Text style={styles.menuText}>Privacidad y control</Text>
+            <AppIcon name="settings" size={20} color={colors.ink} />
+            <Text style={styles.menuText}>Configuración</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => handleNavigate('PlanPremium')}
           >
-            <AppIcon name="sparkles" size={20} />
+            <AppIcon name="sparkles" size={20} color={colors.ink} />
             <Text style={styles.menuText}>Plan y Premium</Text>
           </TouchableOpacity>
 
@@ -186,7 +189,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             onPress={handleSignOutPress}
             disabled={isSigningOut}
           >
-            <AppIcon name="logout" size={20} />
+            <AppIcon name="logout" size={20} color={colors.danger} />
             <Text style={styles.menuText}>Cerrar sesión</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -195,7 +198,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1000,
@@ -206,7 +209,7 @@ const styles = StyleSheet.create({
     top: 50,
     left: 20,
     width: 200,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 8,
     elevation: 5,
     zIndex: 1001,
@@ -219,12 +222,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   menuText: {
+    color: colors.ink,
     marginLeft: 10,
     fontSize: 16,
   },
   divider: {
     height: 1,
-    backgroundColor: '#ccc',
+    backgroundColor: colors.line,
     marginVertical: 6,
   },
 });

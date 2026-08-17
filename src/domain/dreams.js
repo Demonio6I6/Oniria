@@ -71,11 +71,58 @@ const truncateText = (text, maxLength) => {
     : normalized;
 };
 
+export const RECENT_DREAM_CONTEXT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const getPreviousRecentDream = (
+  dreams,
+  {
+    currentDreamId = '',
+    currentTimestamp = Date.now(),
+    maxAgeMs = RECENT_DREAM_CONTEXT_WINDOW_MS,
+  } = {}
+) => {
+  const referenceTimestamp = Number(currentTimestamp) || Date.now();
+
+  return sortDreamsByNewest(dreams).find(dream => {
+    const dreamTimestamp = Number(getDreamTimestamp(dream));
+    const dreamId = getDreamId(dream);
+    const ageMs = referenceTimestamp - dreamTimestamp;
+
+    return dreamId !== currentDreamId &&
+      Number.isFinite(dreamTimestamp) &&
+      ageMs >= 0 &&
+      ageMs <= maxAgeMs;
+  }) || null;
+};
+
+export const buildPreviousDreamContext = dream => {
+  if (!dream) return '';
+
+  const timestamp = getDreamTimestamp(dream);
+  const description = dream?.description || getDreamSummary(dream);
+
+  return [
+    'Contexto del sueño anterior reciente aportado por el usuario:',
+    timestamp ? `Fecha: ${formatDateKey(timestamp)}` : '',
+    description
+      ? `Sueño contado: ${truncateText(description, 650)}`
+      : '',
+    dream?.wakingEmotion
+      ? `Emoción indicada al despertar: ${dream.wakingEmotion}`
+      : '',
+    dream?.wakingContext
+      ? `Asociación con su vida: ${truncateText(dream.wakingContext, 350)}`
+      : '',
+    dream?.personalReflection
+      ? `Reflexión personal posterior: ${truncateText(dream.personalReflection, 350)}`
+      : '',
+  ].filter(Boolean).join('\n');
+};
+
 export const buildDreamAnalysisText = (dream) => {
   const timestamp = getDreamTimestamp(dream);
   const date = timestamp ? formatDateKey(timestamp) : 'sin fecha';
   const emotions = Array.isArray(dream?.emotions) ? dream.emotions : [];
-  const interpretation = getDreamInterpretation(dream);
 
   return [
     `Fecha: ${date}`,
@@ -90,9 +137,6 @@ export const buildDreamAnalysisText = (dream) => {
       ? `Asociacion personal: ${truncateText(dream.wakingContext, 400)}`
       : '',
     emotions.length ? `Emociones detectadas: ${emotions.join(', ')}` : '',
-    interpretation
-      ? `Interpretacion guardada: ${truncateText(interpretation, 1100)}`
-      : '',
     dream?.resonance ? `Valoracion de la lectura: ${dream.resonance}` : '',
     dream?.personalReflection
       ? `Reflexion personal: ${truncateText(dream.personalReflection, 500)}`

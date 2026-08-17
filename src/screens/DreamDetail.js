@@ -23,7 +23,8 @@ import {
   updateDreamRecordById,
 } from '../services/dreamRepository';
 import { trackProductEvent } from '../services/productAnalytics';
-import { colors, radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { radii, screenPadding, spacing, typography } from '../theme/tokens';
+import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const RESONANCE_OPTIONS = [
   { value: 'resuena', label: 'Me representa' },
@@ -32,6 +33,9 @@ const RESONANCE_OPTIONS = [
 ];
 
 export default function DreamDetail({ navigation, route }) {
+  const { colors } = useAppTheme();
+  const styles = useThemeStyles(createStyles);
+  const markdownStyles = useThemeStyles(createMarkdownStyles);
   const dreamId = route.params?.dreamId;
   const [dream, setDream] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -238,7 +242,7 @@ export default function DreamDetail({ navigation, route }) {
   );
 }
 
-const markdownStyles = {
+const createMarkdownStyles = colors => ({
   body: {
     color: colors.ink,
     fontSize: 15,
@@ -267,9 +271,9 @@ const markdownStyles = {
   strong: {
     fontWeight: '800',
   },
-};
+});
 
-const styles = StyleSheet.create({
+const createStyles = colors => StyleSheet.create({
   keyboardView: { flex: 1 },
   screen: { backgroundColor: colors.background, flex: 1 },
   container: {
@@ -343,7 +347,7 @@ const styles = StyleSheet.create({
   },
   manualIcon: {
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 11,
     height: 40,
     justifyContent: 'center',
