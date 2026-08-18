@@ -28,6 +28,9 @@
       "googleServicesFile": "./assets/google-services.json",
       "allowBackup": false,
       "blockedPermissions": [
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.ACCESS_ADSERVICES_AD_ID",
+        "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.SYSTEM_ALERT_WINDOW"
@@ -64,7 +67,17 @@
       "expo-web-browser",
       "expo-system-ui",
       "@react-native-firebase/app",
-      "@react-native-firebase/app-check"
+      "@react-native-firebase/app-check",
+      [
+        "@react-native-firebase/analytics",
+        {
+          "ios": {
+            "withoutAdIdSupport": true
+          }
+        }
+      ],
+      "@react-native-firebase/crashlytics",
+      "@react-native-firebase/perf"
     ],
     "owner": "hayda666",
     "extra": {

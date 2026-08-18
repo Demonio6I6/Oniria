@@ -48,16 +48,16 @@ if (
 
 const ERROR_MESSAGES = {
   'auth/email-already-in-use': 'Ese correo ya tiene una cuenta.',
-  'auth/invalid-email': 'El correo no es valido.',
-  'auth/missing-password': 'Escribe una contrasena.',
+  'auth/invalid-email': 'El correo no es válido.',
+  'auth/missing-password': 'Escribe una contraseña.',
   'auth/operation-not-allowed': 'Activa este proveedor en Firebase Authentication.',
   'auth/user-not-found': 'No existe una cuenta con ese correo.',
-  'auth/weak-password': 'La contrasena debe tener al menos 6 caracteres.',
-  'auth/wrong-password': 'La contrasena no es correcta.',
+  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
+  'auth/wrong-password': 'La contraseña no es correcta.',
 };
 
 function getAuthErrorMessage(error) {
-  return ERROR_MESSAGES[error?.code] || error?.message || 'No se pudo completar la autenticacion.';
+  return ERROR_MESSAGES[error?.code] || error?.message || 'No se pudo completar la autenticación.';
 }
 
 function AuthMethodIcon({ type, active }) {
@@ -175,10 +175,10 @@ export default function HomeScreen({
   signInAsGuest,
   forceAuthOptions = false,
   allowGuest = true,
-  panelTitle = 'Empieza tu diario',
-  panelSubtitle = 'Elige cómo quieres guardar tu recorrido.',
-  heroTitle = 'Conócete a través de lo que sueñas.',
-  heroText = 'Registra tus sueños, explora posibles significados y reconoce patrones con el tiempo.',
+  panelTitle = 'Empieza a interpretar',
+  panelSubtitle = 'Elige cómo quieres continuar.',
+  heroTitle = 'Otra mirada a lo que sueñas.',
+  heroText = 'Describe un sueño, recibe una lectura orientativa y reconoce patrones con el tiempo.',
 }) {
   const { colors } = useAppTheme();
   const styles = useThemeStyles(createStyles);
@@ -344,8 +344,8 @@ export default function HomeScreen({
             <View style={styles.valueNote}>
               <AppIcon name="info" size={18} color={colors.primary} />
               <Text style={styles.valueNoteText}>
-                Lunentra no adivina ni diagnostica. Te ayuda a observar y
-                reflexionar sobre tu propia experiencia.
+                Lunentra no adivina ni diagnostica. Te ofrece una interpretación
+                posible para que tú decidas qué sentido tiene.
               </Text>
             </View>
 
@@ -385,7 +385,7 @@ export default function HomeScreen({
                       value={password}
                       onChangeText={setPassword}
                       secureTextEntry
-                      placeholder="Contrasena"
+                      placeholder="Contraseña"
                       placeholderTextColor={colors.subtle}
                       style={styles.input}
                     />
@@ -437,7 +437,7 @@ export default function HomeScreen({
                         runAuthAction(
                           'resetPassword',
                           () => resetPassword(email),
-                          'Te enviamos un correo para restablecer la contrasena.'
+                          'Te enviamos un correo para restablecer la contraseña.'
                         )
                       }
                       style={styles.linkButton}
@@ -451,7 +451,7 @@ export default function HomeScreen({
                             (!email.trim() || isBusy) && styles.disabledText,
                           ]}
                         >
-                          Recuperar contrasena
+                          Recuperar contraseña
                         </Text>
                       )}
                     </Pressable>
@@ -468,8 +468,8 @@ export default function HomeScreen({
               {allowGuest ? (
                 <AuthMethodButton
                   type="guest"
-                  title="Entrar como invitado"
-                  description="Explorar Lunentra sin compromiso"
+                  title="Probar como invitado"
+                  description="Haz una interpretación sin crear una cuenta"
                   disabled={isBusy}
                   loading={busyAction === 'guest'}
                   onPress={() => runAuthAction('guest', signInAsGuest)}

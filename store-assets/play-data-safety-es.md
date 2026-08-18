@@ -19,8 +19,12 @@ Preparado a partir del comportamiento de la versión Android 1.0.0 (código 6). 
 | Información personal | Otra información | Sí | No | No | No | Funcionalidad de la app; personalización |
 | Información financiera | Historial de compras | Sí | No | No | Sí | Funcionalidad de la app; analítica |
 | Salud y actividad física | Información de salud | Sí | No | No | No | Funcionalidad de la app; personalización |
-| Actividad en la aplicación | Interacciones con la aplicación | Sí | No | No | Sí | Analítica |
+| Ubicación | Ubicación aproximada | Sí | No | No | No | Analítica |
+| Actividad en la aplicación | Interacciones con la aplicación | Sí | No | No | No | Analítica |
 | Actividad en la aplicación | Otro contenido generado por el usuario | Sí | No | No | No | Funcionalidad de la app; personalización |
+| Información y rendimiento de la aplicación | Registros de fallos | Sí | No | No | No | Analítica |
+| Información y rendimiento de la aplicación | Diagnósticos | Sí | No | No | No | Analítica |
+| Información y rendimiento de la aplicación | Otros datos de rendimiento | Sí | No | No | No | Analítica |
 | Dispositivo u otros IDs | Dispositivo u otros IDs | Sí | No | No | Sí | Funcionalidad de la app; seguridad y prevención del fraude; comunicaciones del desarrollador |
 
 ## Justificación por tipo
@@ -29,7 +33,9 @@ Preparado a partir del comportamiento de la versión Android 1.0.0 (código 6). 
 - **IDs de usuario:** Firebase UID, ID de instalación y el mismo UID usado como identificador de RevenueCat. Se utilizan para autenticar, aplicar cuotas, sincronizar Premium y asociar eventos operativos.
 - **Otra información e información de salud:** las respuestas opcionales del perfil pueden contener relaciones, historia personal, emociones, estrés o ansiedad. Solo salen del dispositivo cuando el usuario acepta solicitar una lectura de IA.
 - **Historial de compras:** RevenueCat y el servidor procesan producto, estado y vigencia de la suscripción. RevenueCat indica que este tipo es obligatorio y que sus finalidades son funcionalidad y analítica.
-- **Interacciones:** se guardan eventos limitados como apertura del paywall, inicio/resultado de compra, uso de una lectura o guardado de una reflexión. No incluyen el texto del sueño.
+- **Ubicación aproximada:** Google Analytics puede derivar el país o la región aproximada a partir de datos técnicos de conexión; no se recoge ubicación precisa.
+- **Interacciones:** con consentimiento se guardan eventos limitados como pantallas, apertura del paywall, inicio/resultado de compra, uso de una lectura o guardado de una reflexión. No incluyen el texto del sueño.
+- **Fallos, diagnósticos y rendimiento:** con consentimiento, Firebase Crashlytics y Performance Monitoring recogen fallos, versión de la app y del sistema, modelo de dispositivo, estado técnico, latencias y trazas. No se adjuntan sueños, perfil ni contenido de IA.
 - **Otro contenido generado por el usuario:** texto del sueño, asociaciones y contexto enviados voluntariamente para una lectura, además de la respuesta de IA y el motivo enviados al denunciarla. El diario que nunca se envía y permanece cifrado en el dispositivo queda fuera del alcance de la declaración.
 - **Dispositivo u otros IDs:** ID de instalación para límites y prevención de abuso, y token de notificación solo cuando el usuario activa recordatorios.
 
@@ -39,8 +45,14 @@ Preparado a partir del comportamiento de la versión Android 1.0.0 (código 6). 
 - Información de pago o tarjeta; la recoge Google Play directamente y Lunentra no accede a ella.
 - Número de teléfono; la versión 6 ya no ofrece autenticación por SMS.
 - Fotos, vídeos, audio, archivos, calendario, contactos, mensajes, historial web o aplicaciones instaladas.
-- Registros de fallos o diagnósticos: no hay un SDK de crash reporting o rendimiento configurado en esta versión.
 - ID de publicidad: la aplicación no declara `com.google.android.gms.permission.AD_ID` ni integra publicidad.
+
+## Controles de medición
+
+- Analytics, Crashlytics y Performance Monitoring están desactivados por defecto.
+- La aplicación solicita consentimiento explícito y permite retirarlo desde “Privacidad y control”.
+- Los consentimientos publicitarios permanecen denegados y la recopilación de Advertising ID está desactivada.
+- Al denegar o retirar el consentimiento también se detienen los eventos opcionales enviados a `privateProductEvents`.
 
 ## Decisiones conservadoras
 

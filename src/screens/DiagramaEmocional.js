@@ -174,6 +174,7 @@ export default function DiagramaEmocional() {
   const [analisisMensual, setAnalisisMensual] = useState('');
   const [monthlyAnalysisRecord, setMonthlyAnalysisRecord] = useState(null);
   const [analizandoMensual, setAnalizandoMensual] = useState(false);
+  const [advancedVisible, setAdvancedVisible] = useState(false);
   const [dreamRecordsRevision, setDreamRecordsRevision] = useState(0);
   const chartSize = Math.max(
     RADAR_MIN_SIZE,
@@ -633,15 +634,25 @@ export default function DiagramaEmocional() {
 
       {cantidadSuenos ? (
         <View style={styles.advancedSection}>
-          <View style={styles.advancedToggle}>
+          <TouchableOpacity
+            style={styles.advancedToggle}
+            onPress={() => setAdvancedVisible(current => !current)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: advancedVisible }}
+          >
             <View style={styles.advancedCopy}>
               <Text style={styles.advancedTitle}>Vista avanzada</Text>
               <Text style={styles.advancedText}>
                 Comparar todas las emociones en el radar
               </Text>
             </View>
-          </View>
-          {renderRadarChart()}
+            <AppIcon
+              name={advancedVisible ? 'chevronUp' : 'chevronDown'}
+              size={19}
+              color={colors.muted}
+            />
+          </TouchableOpacity>
+          {advancedVisible ? renderRadarChart() : null}
         </View>
       ) : null}
     </ScrollView>

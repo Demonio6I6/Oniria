@@ -180,7 +180,7 @@ export default function PlanPremium({ navigation }) {
       <View style={styles.privacyNote}>
         <AppIcon name="shield" size={18} color={colors.muted} />
         <Text style={styles.privacyText}>
-          Tu diario sigue cifrado en este dispositivo. Crear una cuenta no crea
+          Tu historial sigue cifrado en este dispositivo. Crear una cuenta no crea
           automáticamente una copia en la nube.
         </Text>
       </View>

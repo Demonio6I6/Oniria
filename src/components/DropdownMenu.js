@@ -155,7 +155,7 @@ export default function DropdownMenu({ isVisible, onClose, signOut, user }) {
             onPress={() => handleNavigate('SuenosGuardados')}
           >
             <AppIcon name="bookmark" size={20} color={colors.ink} />
-            <Text style={styles.menuText}>Mi diario</Text>
+            <Text style={styles.menuText}>Historial</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

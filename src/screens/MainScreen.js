@@ -243,54 +243,6 @@ const guardarRegistroSueno = async ({
   }
 };
 
-const guardarRegistroManual = async ({
-  descripcion,
-  profileSnapshot,
-  wakingEmotion,
-  wakingContext,
-}) => {
-  const timestamp = Date.now();
-  const dreamId = createDreamId(timestamp);
-  const dateKey = formatDateKey(timestamp);
-  const emociones = normalizeDreamEmotions(
-    wakingEmotion ? [wakingEmotion] : []
-  );
-  const record = {
-    id: dreamId,
-    schemaVersion: 4,
-    description: descripcion,
-    initialInterpretation: '',
-    fullInterpretation: '',
-    conversation: buildDreamConversation({ description: descripcion }),
-    summary: createFallbackSummary(descripcion),
-    emotions: emociones,
-    profileSnapshot,
-    wakingEmotion: wakingEmotion || '',
-    wakingContext: wakingContext || '',
-    personalReflection: '',
-    resonance: '',
-    interactionStatus: 'manual_saved',
-    promptVersion: 'manual_v1',
-    timestamp,
-    createdAt: timestamp,
-    dateKey,
-  };
-
-  await saveDreamRecord(record);
-
-  if (emociones.length > 0) {
-    await appendEmotionRecord({
-      dreamId,
-      emociones,
-      timestamp,
-      dateKey,
-      source: 'manual_record_v1',
-    });
-  }
-
-  return record;
-};
-
 const actualizarRegistroSuenoConAmpliacion = async ({
   dreamId,
   descripcion,
@@ -339,7 +291,7 @@ const confirmarPrivacidadIA = async () => {
 
   return new Promise(resolve => {
     Alert.alert(
-      'Privacidad de la interpretacion',
+      'Privacidad de la interpretación',
       'Para interpretar tu sueño se enviarán su texto, las respuestas de tu perfil y, si existe, el contexto confirmado de tu sueño anterior reciente a nuestro servidor y al proveedor de IA. No se usa como diagnóstico clínico.',
       [
         {
@@ -395,16 +347,16 @@ const buildInterpretationErrorMessage = (error, isInitialInteraction) => {
   const details = getFunctionErrorDetails(error);
 
   if (code === 'failed-precondition' && details.reason === 'account-required') {
-    return 'Crea una cuenta para conservar tus suenos y continuar con esta lectura.';
+    return 'Crea una cuenta para conservar tus sueños y continuar con esta lectura.';
   }
 
   if (code === 'resource-exhausted' && isInitialInteraction) {
     if (details.reason === 'interpretation-in-progress') {
-      return 'Ya hay una interpretacion en curso. Espera un momento antes de intentar otra vez.';
+      return 'Ya hay una interpretación en curso. Espera un momento antes de intentar otra vez.';
     }
 
     if (details.reason === 'guest-demo-used') {
-      return 'Ya usaste tu interpretacion demo como invitado. Crea una cuenta para continuar.';
+      return 'Ya usaste tu interpretación de prueba como invitado. Crea una cuenta para continuar.';
     }
 
     if (details.reason === 'free-interpretation-limit') {
@@ -427,10 +379,10 @@ const buildInterpretationErrorMessage = (error, isInitialInteraction) => {
   }
 
   if (code === 'resource-exhausted') {
-    return 'Esta interpretacion ya alcanzo su limite de ampliacion.';
+    return 'Esta interpretación ya alcanzó su límite de ampliación.';
   }
 
-  return 'Hubo un error al obtener la interpretacion.';
+  return 'Hubo un error al obtener la interpretación.';
 };
 
 const getPaywallReasonFromError = (error) => {
@@ -466,7 +418,6 @@ export default function MainScreen({ navigation, route }) {
   const [reflectionDraft, setReflectionDraft] = useState('');
   const [resonance, setResonance] = useState('');
   const [reflectionStatus, setReflectionStatus] = useState('');
-  const [savedWithoutAi, setSavedWithoutAi] = useState(false);
   const [sourceManualDreamId, setSourceManualDreamId] = useState('');
   const [sourceManualDreamTimestamp, setSourceManualDreamTimestamp] = useState(0);
   const [optionalContextVisible, setOptionalContextVisible] = useState(false);
@@ -509,7 +460,6 @@ export default function MainScreen({ navigation, route }) {
     setSourceManualDreamTimestamp(
       manualDream.createdAt || manualDream.timestamp || 0
     );
-    setSavedWithoutAi(false);
     navigation.setParams({ manualDream: undefined });
   }, [navigation, route?.params?.manualDream]);
 
@@ -713,52 +663,6 @@ export default function MainScreen({ navigation, route }) {
     }
   };
 
-  const guardarSinInterpretacion = async () => {
-    const currentDescription = descripcion.trim();
-    if (!currentDescription || cargando) return;
-
-    Keyboard.dismiss();
-    setCargando(true);
-
-    try {
-      const profileSnapshot = buildProfileSnapshot(respuestas);
-      const record = await guardarRegistroManual({
-        descripcion: currentDescription,
-        profileSnapshot,
-        wakingEmotion,
-        wakingContext: wakingContext.trim(),
-      });
-
-      setActiveDream({
-        id: record.id,
-        description: currentDescription,
-        initialInterpretation: '',
-        profileSnapshot,
-        wakingEmotion,
-        wakingContext: wakingContext.trim(),
-      });
-      setMessages([
-        { role: 'user', text: currentDescription },
-        {
-          role: 'assistant',
-          text: 'Tu sueño quedó guardado sin usar una lectura de IA. Puedes interpretarlo más adelante desde Mi diario.',
-        },
-      ]);
-      setDescripcion('');
-      setSavedWithoutAi(true);
-      setInteractionStep(INTERACTION_STEPS.CLOSED);
-      trackProductEvent('manual_dream_saved', {
-        accountType: subscription.isGuest ? 'guest' :
-          subscription.isPremium ? 'premium' : 'free',
-      });
-    } catch (error) {
-      console.error('Error guardando el sueño sin IA:', error);
-      Alert.alert('No se pudo guardar', 'Inténtalo de nuevo en unos segundos.');
-    } finally {
-      setCargando(false);
-    }
-  };
-
   const handleContentSizeChange = (event) => {
     const { height } = event.nativeEvent.contentSize;
     const minHeight =
@@ -873,13 +777,9 @@ export default function MainScreen({ navigation, route }) {
     : subscription.isPremium
       ? `${interpretationRemaining} de ${interpretationLimit} lecturas Premium disponibles este mes`
       : `${interpretationRemaining} de ${interpretationLimit} lecturas de IA disponibles`;
-  const savedDreamAvailabilityText = savedWithoutAi
-    ? 'Podrás interpretarlo más adelante desde Mi diario.'
-    : interpretationRetryLabel
-      ? `Tus lecturas se renuevan el ${interpretationRetryLabel}. Mientras tanto, puedes guardar otros sueños sin usar IA.`
-      : initialPaywallReason
-        ? 'Puedes seguir guardando nuevos sueños sin usar IA.'
-        : 'Si recuerdas otro sueño, podrás guardarlo desde la opción Registrar.';
+  const nextInterpretationText = interpretationRetryLabel
+    ? `Podrás hacer otra interpretación a partir del ${interpretationRetryLabel}.`
+    : 'Cuando recuerdes otro sueño, podrás interpretarlo desde Inicio.';
 
   const getUserMessageLabel = (messageIndex) => {
     if (!activeDream) return 'Tu sueño';
@@ -911,7 +811,7 @@ export default function MainScreen({ navigation, route }) {
     );
     const aiActionLabel = isInitialComposer && initialPaywallReason
       ? subscription.isGuest ? 'Crear cuenta para interpretar' : 'Ver Premium'
-      : isInitialComposer ? 'Explorar este sueño' : 'Profundizar';
+      : isInitialComposer ? 'Interpretar mi sueño' : 'Profundizar';
     const aiActionDisabled = initialPaywallReason
       ? false
       : !descripcionLista || cargando;
@@ -929,7 +829,7 @@ export default function MainScreen({ navigation, route }) {
         ]}
       >
         <Text style={styles.composerLabel}>
-          {isInitialComposer ? '1 · Lo que recuerdas' : 'Tu ampliación'}
+          {isInitialComposer ? 'LO QUE RECUERDAS' : 'TU AMPLIACIÓN'}
         </Text>
         {isInitialComposer ? (
           <View style={styles.usageBanner}>
@@ -966,7 +866,7 @@ export default function MainScreen({ navigation, route }) {
           >
             <View style={styles.optionalContextToggleCopy}>
               <Text style={styles.optionalContextToggleTitle}>
-                2 · Añadir emoción y contexto
+                Añadir emoción o contexto
               </Text>
               <Text style={styles.optionalContextToggleHint}>
                 Opcional · hace la lectura más personal
@@ -1036,20 +936,6 @@ export default function MainScreen({ navigation, route }) {
           <Text style={styles.primaryActionText}>{aiActionLabel}</Text>
           <AppIcon name="send" size={19} color={colors.white} />
         </TouchableOpacity>
-        {isInitialComposer ? (
-          <TouchableOpacity
-            style={[
-              styles.manualSaveButton,
-              (!descripcionLista || cargando) && styles.manualSaveButtonDisabled,
-            ]}
-            onPress={guardarSinInterpretacion}
-            disabled={!descripcionLista || cargando}
-          >
-            <Text style={styles.manualSaveButtonText}>
-              Guardar en el diario sin usar IA
-            </Text>
-          </TouchableOpacity>
-        ) : null}
       </View>
     );
   };
@@ -1071,11 +957,11 @@ export default function MainScreen({ navigation, route }) {
           {mostrarIntroInicial && (
             <View style={styles.initialIntro}>
               <Text style={styles.title}>
-                Cuéntame lo que recuerdas
+                ¿Qué soñaste?
               </Text>
               <Text style={styles.subtitle}>
-                No hace falta reconstruirlo entero. Empieza por una escena, una
-                persona, una sensación o el detalle que siga contigo.
+                No hace falta recordarlo entero. Una escena, una persona o una
+                sensación basta para recibir otra mirada.
               </Text>
             </View>
           )}
@@ -1128,12 +1014,12 @@ export default function MainScreen({ navigation, route }) {
             <View style={styles.savedBanner}>
               <AppIcon name="checkCircle" size={18} color={colors.success} />
               <Text style={styles.savedBannerText}>
-                Tu sueño ya está guardado en Mi diario.
+                La interpretación ya está guardada en tu historial.
               </Text>
             </View>
           ) : null}
 
-          {activeDream && !cargando && !esPasoInicial && !savedWithoutAi ? (
+          {activeDream && !cargando && !esPasoInicial ? (
             <View style={styles.reflectionCard}>
               <Text style={styles.reflectionEyebrow}>TU VOZ IMPORTA</Text>
               <Text style={styles.reflectionTitle}>
@@ -1207,7 +1093,7 @@ export default function MainScreen({ navigation, route }) {
 
               {reflectionStatus === 'saved' ? (
                 <Text style={styles.reflectionSuccess}>
-                  Tu reflexión quedó guardada en el diario.
+                  Tu reflexión quedó guardada en el historial.
                 </Text>
               ) : null}
               {reflectionStatus === 'error' ? (
@@ -1246,15 +1132,13 @@ export default function MainScreen({ navigation, route }) {
                 <AppIcon name="checkCircle" size={24} color={colors.success} />
               </View>
               <Text style={styles.closedNoticeTitle}>
-                Tu sueño se guardó correctamente
+                Interpretación completada
               </Text>
               <Text style={styles.closedNoticeText}>
-                {savedWithoutAi
-                  ? 'Quedó guardado en tu diario sin usar una lectura de IA.'
-                  : 'El sueño, la lectura y tu ampliación quedaron guardados en Mi diario.'}
+                El sueño, la lectura y tu ampliación quedaron guardados en tu historial.
               </Text>
               <Text style={styles.closedNoticeHint}>
-                {savedDreamAvailabilityText}
+                {nextInterpretationText}
               </Text>
               <TouchableOpacity
                 style={styles.journalButton}
@@ -1262,7 +1146,7 @@ export default function MainScreen({ navigation, route }) {
               >
                 <AppIcon name="bookmark" size={18} color={colors.white} />
                 <Text style={styles.journalButtonText}>
-                  Ver en Mi diario
+                  Ver historial
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1480,22 +1364,6 @@ const createStyles = colors => StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     marginRight: 8,
-  },
-  manualSaveButton: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-    minHeight: 44,
-    paddingHorizontal: 14,
-  },
-  manualSaveButtonDisabled: {
-    opacity: 0.45,
-  },
-  manualSaveButtonText: {
-    color: colors.primary,
-    fontSize: 13,
-    fontWeight: '800',
   },
   message: {
     marginBottom: spacing.lg,

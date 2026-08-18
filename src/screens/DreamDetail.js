@@ -165,7 +165,7 @@ export default function DreamDetail({ navigation, route }) {
                 style={styles.inlineAction}
                 onPress={() => navigation.navigate('NuevoSueno', { manualDream: dream })}
               >
-                <Text style={styles.inlineActionText}>Explorar este sueño</Text>
+                <Text style={styles.inlineActionText}>Interpretar este sueño</Text>
                 <AppIcon name="arrowRight" size={17} color={colors.primary} />
               </TouchableOpacity>
             </View>

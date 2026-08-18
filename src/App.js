@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   initialWindowMetrics,
@@ -17,6 +17,11 @@ import { SubscriptionContext } from './subscriptions/SubscriptionContext';
 import { useSubscriptionState } from './subscriptions/useSubscriptionState';
 import { ThemeProvider, useAppTheme } from './theme/ThemeContext';
 import { darkColors } from './theme/tokens';
+import {
+  initializeTelemetry,
+  setTelemetryConsent,
+  setTelemetryUserProperties,
+} from './services/telemetry';
 
 SystemUI.setBackgroundColorAsync(darkColors.background).catch(() => {});
 
@@ -52,6 +57,55 @@ function AppContent() {
       console.error('No se pudo actualizar el fondo del sistema:', error);
     });
   }, [colors.background]);
+
+  useEffect(() => {
+    if (loading || !isReady) return undefined;
+
+    let active = true;
+    initializeTelemetry().then(consent => {
+      if (!active || consent !== null) return;
+
+      Alert.alert(
+        'Ayúdanos a mejorar Lunentra',
+        'Con tu permiso, recopilaremos uso anónimo, fallos y rendimiento. Nunca enviaremos tus sueños, respuestas del perfil ni el contenido de tus lecturas. Puedes cambiarlo después en Privacidad y control.',
+        [
+          {
+            text: 'Ahora no',
+            style: 'cancel',
+            onPress: () => setTelemetryConsent(false).catch(() => null),
+          },
+          {
+            text: 'Permitir',
+            onPress: () => setTelemetryConsent(true).catch(error => {
+              console.error('No se pudo guardar el consentimiento:', error);
+            }),
+          },
+        ],
+        { cancelable: false }
+      );
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isReady, loading]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const accountType = !user
+      ? 'signed_out'
+      : user.isAnonymous
+        ? 'guest'
+        : subscription.isPremium
+          ? 'premium'
+          : 'free';
+
+    setTelemetryUserProperties({
+      account_type: accountType,
+      premium_status: subscription.isPremium ? 'active' : 'inactive',
+    }).catch(() => null);
+  }, [loading, subscription.isPremium, user]);
 
   const showInfo = () => {
     alert(

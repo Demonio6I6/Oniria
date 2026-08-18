@@ -17,22 +17,22 @@ const ONBOARDING_MARK = require('../../assets/icon.png');
 
 const PAGES = [
   {
-    eyebrow: 'RECUERDA Y REGISTRA',
-    icon: 'bookmark',
-    title: 'Guarda tus sueños antes de que desaparezcan.',
-    text: 'Crea un diario privado con los lugares, personas, emociones y escenas que recuerdes.',
+    eyebrow: 'CUÉNTANOS TU SUEÑO',
+    icon: 'moon',
+    title: 'Escríbelo antes de que se desvanezca.',
+    text: 'Una escena, una persona o una sensación es suficiente para empezar una interpretación.',
   },
   {
-    eyebrow: 'EXPLORA, NO ADIVINES',
-    icon: 'search',
-    title: 'Una lectura es una posibilidad, no una verdad absoluta.',
-    text: 'Lunentra conecta el sueño con tu contexto personal y te propone preguntas para reflexionar.',
+    eyebrow: 'RECIBE OTRA MIRADA',
+    icon: 'sparkles',
+    title: 'Explora lo que podría significar para ti.',
+    text: 'Lunentra conecta símbolos, emociones y contexto para ofrecerte una lectura orientativa, nunca una verdad absoluta.',
   },
   {
-    eyebrow: 'RECONOCE PATRONES',
+    eyebrow: 'OBSERVA CON EL TIEMPO',
     icon: 'chart',
-    title: 'Lo valioso aparece con el tiempo.',
-    text: 'Al sumar registros puedes observar cambios y repeticiones. Tu diario se guarda cifrado y solo se envía a la IA cuando solicitas una lectura.',
+    title: 'Cada interpretación completa tu panorama.',
+    text: 'Tus lecturas quedan organizadas para que puedas volver y reconocer emociones, cambios y patrones personales.',
   },
 ];
 
@@ -103,7 +103,7 @@ export default function OnboardingScreen({ onFinish }) {
 
           <Pressable style={styles.primaryButton} onPress={handleNext}>
             <Text style={styles.primaryButtonText}>
-              {isLastPage ? 'Empezar mi diario' : 'Siguiente'}
+              {isLastPage ? 'Interpretar mi primer sueño' : 'Siguiente'}
             </Text>
             <AppIcon name="arrowRight" size={19} color="#111827" />
           </Pressable>

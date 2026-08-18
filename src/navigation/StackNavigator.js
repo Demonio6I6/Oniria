@@ -18,6 +18,7 @@ import RestoreAnswersButton from '../components/RestoreAnswersButton';
 import AppIcon from '../components/AppIcon';
 import BottomNavigation from '../components/BottomNavigation';
 import { navigationRef } from '../utils/navigationRef';
+import { trackScreen } from '../services/telemetry';
 import { useAppTheme } from '../theme/ThemeContext';
 
 const Stack = createStackNavigator();
@@ -62,7 +63,12 @@ export default function StackNavigator({
 
   const updateCurrentRoute = () => {
     const routeName = navigationRef.getCurrentRoute()?.name;
-    if (routeName) setCurrentRoute(routeName);
+    if (routeName) {
+      setCurrentRoute(routeName);
+      trackScreen(routeName).catch(error => {
+        console.warn('No se pudo medir la pantalla actual:', error);
+      });
+    }
   };
 
   const handleRootNavigation = routeName => {
@@ -119,7 +125,7 @@ export default function StackNavigator({
           name="NuevoSueno"
           component={MainScreen}
           options={{
-            title: 'Explorar un sueño',
+            title: 'Interpretar un sueño',
             headerRight: () => (
               <View style={{ flexDirection: 'row' }}>
                 <TouchableOpacity
@@ -197,7 +203,7 @@ export default function StackNavigator({
             );
 
             return {
-              title: 'Mi diario',
+              title: 'Historial',
               headerRight: () =>
                 selectionMode ? renderSelectionHeader() : renderNormalHeader(),
             };
@@ -232,7 +238,7 @@ export default function StackNavigator({
               panelTitle="Crea tu cuenta"
               panelSubtitle="Desbloquea tus lecturas gratuitas restantes y continúa donde estabas."
               heroTitle="Haz permanente tu espacio personal."
-              heroText="Tus registros seguirán protegidos en este dispositivo y podrás profundizar en tus lecturas."
+              heroText="Tus interpretaciones seguirán protegidas en este dispositivo y podrás profundizar en tus lecturas."
             />
           )}
         </Stack.Screen>

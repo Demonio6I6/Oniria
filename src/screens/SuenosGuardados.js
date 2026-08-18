@@ -201,13 +201,13 @@ export default function SuenosGuardados({ navigation }) {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.eyebrow}>TU HISTORIA, EN ORDEN</Text>
+        <Text style={styles.eyebrow}>TUS LECTURAS, EN ORDEN</Text>
         <View style={styles.titleRow}>
-          <Text style={styles.title}>Mi diario</Text>
+          <Text style={styles.title}>Historial</Text>
           <Text style={styles.count}>{dreams.length}</Text>
         </View>
         <Text style={styles.subtitle}>
-          Vuelve a tus sueños, asociaciones y reflexiones cuando lo necesites.
+          Vuelve a tus sueños, interpretaciones y reflexiones cuando lo necesites.
         </Text>
 
         <View style={styles.segmentedControl}>
@@ -260,15 +260,15 @@ export default function SuenosGuardados({ navigation }) {
             <View style={styles.emptyIcon}>
               <AppIcon name="moon" size={25} color={colors.primary} />
             </View>
-            <Text style={styles.emptyTitle}>Todavía no hay recuerdos guardados.</Text>
+            <Text style={styles.emptyTitle}>Todavía no hay interpretaciones.</Text>
             <Text style={styles.emptyText}>
-              Empieza con una imagen, una emoción o cualquier detalle que aún recuerdes.
+              Cuéntanos una imagen, una emoción o cualquier detalle que aún recuerdes.
             </Text>
             <TouchableOpacity
               style={styles.emptyButton}
               onPress={() => navigation.navigate('NuevoSueno')}
             >
-              <Text style={styles.emptyButtonText}>Registrar mi primer sueño</Text>
+              <Text style={styles.emptyButtonText}>Interpretar mi primer sueño</Text>
             </TouchableOpacity>
           </View>
         ) : (

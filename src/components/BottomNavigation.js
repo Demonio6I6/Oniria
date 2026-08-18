@@ -7,8 +7,7 @@ import { useAppTheme, useThemeStyles } from '../theme/ThemeContext';
 
 const ITEMS = [
   { route: 'Home', label: 'Inicio', icon: 'moon' },
-  { route: 'SuenosGuardados', label: 'Diario', icon: 'bookmark' },
-  { route: 'NuevoSueno', label: 'Registrar', icon: 'plus', primary: true },
+  { route: 'SuenosGuardados', label: 'Historial', icon: 'bookmark' },
   { route: 'DiagramaEmocional', label: 'Patrones', icon: 'chart' },
   { route: 'Perfil', label: 'Tú', icon: 'profile' },
 ];
@@ -45,11 +44,11 @@ export default function BottomNavigation({ activeRoute, onNavigate }) {
             accessibilityLabel={item.label}
             accessibilityState={{ selected: active }}
           >
-            <View style={item.primary ? styles.primaryIcon : styles.icon}>
+            <View style={styles.icon}>
               <AppIcon
                 name={item.icon}
-                size={item.primary ? 25 : 21}
-                color={item.primary ? colors.white : color}
+                size={21}
+                color={color}
                 strokeWidth={2.1}
               />
             </View>
@@ -57,7 +56,6 @@ export default function BottomNavigation({ activeRoute, onNavigate }) {
               style={[
                 styles.label,
                 active && styles.labelActive,
-                item.primary && styles.primaryLabel,
               ]}
             >
               {item.label}
@@ -89,26 +87,13 @@ const createStyles = colors => StyleSheet.create({
     height: 28,
     justifyContent: 'center',
   },
-  primaryIcon: {
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    borderRadius: 18,
-    height: 38,
-    justifyContent: 'center',
-    marginTop: -14,
-    width: 52,
-  },
   label: {
     color: colors.muted,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     marginTop: 2,
   },
   labelActive: {
     color: colors.primary,
-  },
-  primaryLabel: {
-    color: colors.ink,
-    marginTop: 1,
   },
 });

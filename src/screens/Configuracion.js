@@ -5,6 +5,7 @@ import {
   Linking,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -17,6 +18,11 @@ import {
   revokeAiPrivacyNotice,
   revokeMonthlyAnalysisPrivacyNotice,
 } from '../services/privacyRepository';
+import {
+  getTelemetryConsent,
+  resetTelemetryConsent,
+  setTelemetryConsent as persistTelemetryConsent,
+} from '../services/telemetry';
 import { clearCurrentUserLocalData } from '../services/userStorage';
 import { radii, screenPadding, spacing, typography } from '../theme/tokens';
 import {
@@ -57,16 +63,19 @@ export default function Configuracion({
   const styles = useThemeStyles(createStyles);
   const [aiConsent, setAiConsent] = useState(false);
   const [monthlyConsent, setMonthlyConsent] = useState(false);
+  const [telemetryConsent, setTelemetryConsentState] = useState(false);
   const [busyAction, setBusyAction] = useState('');
 
   const loadConsentState = async () => {
-    const [hasAiConsent, hasMonthlyConsent] = await Promise.all([
+    const [hasAiConsent, hasMonthlyConsent, hasTelemetryConsent] = await Promise.all([
       hasAcceptedAiPrivacyNotice(),
       hasAcceptedMonthlyAnalysisPrivacyNotice(),
+      getTelemetryConsent(),
     ]);
 
     setAiConsent(hasAiConsent);
     setMonthlyConsent(hasMonthlyConsent);
+    setTelemetryConsentState(hasTelemetryConsent === true);
   };
 
   useEffect(() => {
@@ -124,6 +133,21 @@ export default function Configuracion({
     }
   };
 
+  const handleTelemetryChange = async enabled => {
+    if (busyAction) return;
+
+    try {
+      setBusyAction('telemetry');
+      const savedConsent = await persistTelemetryConsent(enabled);
+      setTelemetryConsentState(savedConsent);
+    } catch (error) {
+      console.error('Error cambiando la medición opcional:', error);
+      Alert.alert('Error', 'No se pudo cambiar esta preferencia.');
+    } finally {
+      setBusyAction('');
+    }
+  };
+
   const openExternalUrl = async (url, label) => {
     if (!url) return;
 
@@ -156,10 +180,14 @@ export default function Configuracion({
           onPress: async () => {
             try {
               setBusyAction('deleteLocal');
-              await clearCurrentUserLocalData();
+              await Promise.all([
+                clearCurrentUserLocalData(),
+                resetTelemetryConsent(),
+              ]);
               clearRespuestas();
               setAiConsent(false);
               setMonthlyConsent(false);
+              setTelemetryConsentState(false);
               Alert.alert('Datos borrados', 'El contenido local de Lunentra fue eliminado.');
             } catch (error) {
               console.error('Error borrando datos locales:', error);
@@ -291,7 +319,7 @@ export default function Configuracion({
         <InformationRow
           icon="lock"
           title="Guardado local cifrado"
-          text="Tu diario, contexto y patrones se almacenan protegidos en este dispositivo."
+          text="Tu historial, contexto y patrones se almacenan protegidos en este dispositivo."
         />
         <InformationRow
           icon="send"
@@ -342,6 +370,30 @@ export default function Configuracion({
             )}
           </TouchableOpacity>
         ) : null}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionHeaderCopy}>
+            <Text style={styles.sectionTitle}>Uso y diagnósticos</Text>
+            <Text style={styles.sectionMeta}>
+              {telemetryConsent ? 'Medición anónima activada' : 'Medición desactivada'}
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel="Permitir uso anónimo y diagnósticos"
+            disabled={busyAction === 'telemetry'}
+            onValueChange={handleTelemetryChange}
+            thumbColor={telemetryConsent ? colors.white : colors.muted}
+            trackColor={{ false: colors.line, true: colors.primary }}
+            value={telemetryConsent}
+          />
+        </View>
+        <Text style={styles.sectionDescription}>
+          Ayuda a medir pantallas, funciones utilizadas, conversiones, fallos y
+          rendimiento. No incluye sueños, respuestas personales ni contenido de IA.
+          La medición publicitaria permanece desactivada.
+        </Text>
       </View>
 
       <View style={styles.section}>
@@ -427,7 +479,7 @@ export default function Configuracion({
       <View style={[styles.section, styles.dangerSection]}>
         <Text style={styles.dangerTitle}>Borrar el contenido de este dispositivo</Text>
         <Text style={styles.sectionDescription}>
-          Esta acción elimina el diario, contexto, emociones, análisis y
+          Esta acción elimina el historial, contexto, emociones, análisis y
           preferencias locales. No se puede deshacer.
         </Text>
         <TouchableOpacity
@@ -574,6 +626,10 @@ const createStyles = colors => StyleSheet.create({
     alignItems: 'flex-start',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  sectionHeaderCopy: {
+    flex: 1,
+    marginRight: spacing.md,
   },
   sectionMeta: {
     color: colors.muted,
